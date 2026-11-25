@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALIGNA – Posture App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm, premium wearable-wellness; clinical precision on the technical screen
+   IDEA: a wearable companion app – the phone itself is the page
+   PICTURE: a live, animated seated figure (side + back) whose spine bends with the IMU
+   COLOUR & TYPE: deep teal-navy night, electric mint for "aligned", amber/coral for deviation; Sora + JetBrains Mono
+   LAYOUT: desktop = phone on a stage beside a live pipeline/demo console; mobile = full-screen app */
+:root{color-scheme:dark;--page:#04110F;--bg:#071A1F;--card:#0C252C;--card2:#11313A;--line:rgba(150,235,220,.10);--line2:rgba(150,235,220,.18);
+--ink:#E9F7F4;--mute:#8EB2AF;--dim:#5E807D;--mint:#3CF2B4;--teal:#18C3B0;--amber:#FFB547;--orange:#FF8A5B;--coral:#FF6B7A;--sky:#7CB8FF;--violet:#B69CFF}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(1200px 700px at 70% 20%,#0B2B2C 0,transparent 60%),radial-gradient(900px 600px at 10% 90%,#0A2030 0,transparent 60%),var(--page);color:var(--ink);font:15px/1.5 Sora,system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+/* stage */
+.stage{height:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:40px;align-items:center;padding:20px 48px;max-width:1360px;margin:0 auto}
+.side{max-height:calc(100vh - 40px);overflow:auto;padding-right:6px;scrollbar-width:thin}
+.phoneWrap{position:relative}
+.phone{position:absolute;top:0;left:0;width:390px;height:844px;transform-origin:0 0;border-radius:54px;background:var(--bg);box-shadow:0 0 0 11px #0d1416,0 0 0 12px #2a3638,0 40px 120px rgba(0,0,0,.6),0 0 140px rgba(60,242,180,.08);overflow:hidden;display:flex;flex-direction:column}
+.phone.shake{animation:shake .5s}
+@keyframes shake{0%,100%{translate:0}20%{translate:-3px 0}40%{translate:3px 0}60%{translate:-2px 0}80%{translate:2px 0}}
+.island{position:absolute;top:11px;left:50%;translate:-50% 0;width:118px;height:34px;border-radius:20px;background:#000;z-index:60}
+.statusbar{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:8px 30px 0 34px;font-size:14px;font-weight:600;z-index:5}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;padding:4px 18px 110px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.enter{animation:enter .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (max-width:860px){.overlay{padding-top:0}body{overflow:auto}.stage{display:block;padding:0}.side{display:none}.phoneWrap{width:100%!important;height:100dvh!important}.phone{position:relative;width:100%;height:100dvh;transform:none!important;border-radius:0;box-shadow:none}.island{display:none}.statusbar{display:none}.screen{padding-top:14px}}
+/* nav */
+.nav{position:absolute;left:12px;right:12px;bottom:14px;height:68px;border-radius:26px;background:rgba(10,32,38,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--line2);display:grid;grid-template-columns:repeat(5,1fr);z-index:20}
+.nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--dim);font-weight:500;position:relative;transition:color .2s}
+.nav button.on{color:var(--mint)}
+.nav button.on::before{content:"";position:absolute;top:7px;width:38px;height:30px;border-radius:12px;background:rgba(60,242,180,.12)}
+.nav svg{position:relative}
+/* generic */
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 14px}
+.h1{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1;margin:0}
+.h2{font-size:15px;font-weight:600;margin:0}
+.sub{color:var(--mute);font-size:13px}
+.tiny{font-size:11.5px;color:var(--dim)}
+.card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:24px;padding:16px;margin-bottom:12px;position:relative}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:15px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:12px;font-weight:500;white-space:nowrap}
+.demoPill{background:repeating-linear-gradient(135deg,rgba(255,181,71,.20) 0 6px,rgba(255,181,71,.08) 6px 12px);border-color:rgba(255,181,71,.5);color:var(--amber);font-weight:700;letter-spacing:.02em}
+.btn{height:46px;padding:0 18px;border-radius:16px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.07);border:1px solid var(--line2);transition:transform .15s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:linear-gradient(135deg,var(--mint),var(--teal));color:#03221C;border:0;box-shadow:0 8px 24px rgba(60,242,180,.25)}
+.btn.warn{color:var(--coral);border-color:rgba(255,107,122,.35)}
+.btn.sm{height:38px;padding:0 13px;border-radius:13px;font-size:13px}
+.btn.full{width:100%}
+.btn:disabled{opacity:.45;pointer-events:none}
+.iconbtn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.seg{display:flex;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:14px;padding:3px}
+.seg button{flex:1;height:34px;border-radius:11px;font-size:13px;font-weight:500;color:var(--mute)}
+.seg button.on{background:var(--card2);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.stat .v{font-size:22px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .l{font-size:12px;color:var(--mute)}
+.lbl{font-size:12px;color:var(--mute);font-weight:500}
+/* home */
+.posLabel{font-size:30px;font-weight:600;letter-spacing:-.025em;line-height:1.05;transition:color .4s}
+.hero{padding:10px 8px 8px;overflow:hidden}
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fig{border-radius:18px;padding:6px 4px 2px;transition:background .3s,box-shadow .3s;position:relative}
+.fig.act{background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px var(--line2)}
+.fig svg{display:block;width:100%;height:auto}
+.figcap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute);padding:0 8px 4px}
+.figcap b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.ring{position:relative;width:118px;height:118px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .c{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .c b{font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px;transition:width .3s}
+.gauge{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.07);margin:10px 0 4px}
+.gauge .z{position:absolute;top:0;bottom:0;border-radius:6px;background:rgba(60,242,180,.18)}
+.gauge .k{position:absolute;top:-5px;width:4px;height:20px;border-radius:3px;background:var(--ink);transition:left .25s;box-shadow:0 0 10px currentColor}
+.gauge .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line2)}
+.nudge{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:rgba(255,181,71,.08);border:1px solid rgba(255,181,71,.25);margin-top:12px;font-size:13px}
+.pulseDot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pd 1.8s infinite}
+@keyframes pd{0%{box-shadow:0 0 0 0 rgba(60,242,180,.5)}100%{box-shadow:0 0 0 10px rgba(60,242,180,0)}}
+/* live */
+.hatch{background:repeating-linear-gradient(135deg,rgba(255,181,71,.16) 0 8px,rgba(255,181,71,.05) 8px 16px);border:1px solid rgba(255,181,71,.45);color:#FFD59A;border-radius:16px;padding:10px 12px;font-size:12.5px;display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.hatch.hw{background:rgba(60,242,180,.08);border-color:rgba(60,242,180,.4);color:var(--mint)}
+.chan{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:14px;padding:8px 10px}
+.chan .n{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px}
+.chan .n i{width:7px;height:7px;border-radius:2px;display:inline-block}
+.chan .v{font-size:16px;margin-top:2px}
+.chart{position:relative;height:130px;margin-top:8px}
+.chart canvas{position:absolute;inset:0;width:100%;height:100%}
+.legend{display:flex;gap:12px;font-size:11.5px;color:var(--mute);flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.pipe{display:flex;gap:4px;align-items:stretch;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.pipe div{flex:none;padding:7px 9px;border-radius:11px;background:rgba(0,0,0,.25);border:1px solid var(--line);font-size:11px;line-height:1.3}
+.pipe div b{display:block;font-size:11.5px}
+.pipe .ar{background:none;border:0;padding:0 1px;display:grid;place-items:center;color:var(--dim)}
+/* session */
+.tl{position:relative;height:34px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.05);display:flex}
+.tl i{height:100%;display:block}
+.hrow{display:grid;grid-template-columns:112px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:13px;margin:9px 0}
+.hrow .t{text-align:right;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* trends */
+.bars{display:flex;align-items:flex-end;gap:5px;height:130px}
+.bars .col{flex:1;display:flex;flex-direction:column-reverse;border-radius:6px;overflow:hidden;height:100%;justify-content:flex-start;cursor:pointer;opacity:.85;transition:opacity .2s}
+.bars .col.sel{opacity:1;outline:1px solid var(--line2);outline-offset:2px}
+.xl{display:flex;gap:5px;margin-top:6px}.xl span{flex:1;text-align:center;font-size:10.5px;color:var(--dim);overflow:hidden;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-weight:500;color:var(--mute);text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+td{padding:8px 4px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+/* device & forms */
+.list>div{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;gap:10px}
+.list>div:last-child{border-bottom:0}
+.list .k{color:var(--mute)}
+.list .val{text-align:right;font-weight:500}
+.tog{width:50px;height:30px;border-radius:15px;background:rgba(255,255,255,.12);position:relative;transition:background .2s;flex:none}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}
+.tog.on{background:var(--mint)}.tog.on::after{transform:translateX(20px)}
+input[type=range]{width:100%;accent-color:var(--mint);height:28px}
+input[type=text]{width:100%;height:46px;border-radius:14px;border:1px solid var(--line2);background:rgba(0,0,0,.25);color:var(--ink);font:16px Sora,sans-serif;padding:0 14px}
+.setrow{padding:12px 0;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+details{font-size:13px;color:var(--mute)}
+details summary{cursor:pointer;color:var(--ink);font-weight:600;padding:4px 0;list-style:none;display:flex;justify-content:space-between}
+details summary::-webkit-details-marker{display:none}
+details code{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--mint);overflow-wrap:anywhere}
+details pre{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:12px;padding:10px;font:11px/1.5 "JetBrains Mono",monospace;color:#bfe;overflow-x:auto}
+/* overlays */
+.overlay{position:absolute;inset:0;padding-top:50px;z-index:40;background:var(--bg);display:flex;flex-direction:column;animation:enter .35s}
+.sheetBg{position:absolute;inset:0;z-index:45;background:rgba(0,0,0,.5);animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:46;background:#0E2A31;border-radius:30px 30px 0 0;border-top:1px solid var(--line2);padding:10px 18px 26px;animation:up .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(100%)}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line2);margin:0 auto 12px}
+.pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pbtn{border-radius:16px;padding:10px 6px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:12px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:76px}
+.pbtn.on{border-color:currentColor;background:rgba(255,255,255,.09)}
+.toasts{position:absolute;top:58px;left:14px;right:14px;z-index:70;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(14,42,49,.94);backdrop-filter:blur(12px);border:1px solid var(--line2);border-radius:18px;padding:11px 14px;font-size:13px;display:flex;gap:10px;align-items:center;animation:tin .35s cubic-bezier(.2,.8,.2,1);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+@keyframes tin{from{opacity:0;transform:translateY(-14px) scale(.97)}}
+.dots{display:flex;gap:6px;justify-content:center}.dots i{width:7px;height:7px;border-radius:4px;background:var(--line2);transition:all .3s}.dots i.on{width:22px;background:var(--mint)}
+.steps{display:flex;gap:6px;margin:6px 0 16px}.steps i{flex:1;height:4px;border-radius:2px;background:var(--line2);transition:background .3s}.steps i.on{background:var(--mint)}
+/* side console */
+.brand{display:flex;align-items:center;gap:14px}
+.brand h1{font-size:40px;letter-spacing:.06em;margin:0;font-weight:600;line-height:1}
+.tag{color:var(--mute);font-size:15px;margin:6px 0 0}
+.pn{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid var(--line);margin-bottom:6px;transition:border-color .3s,background .3s}
+.pn.hot{border-color:rgba(60,242,180,.45);background:rgba(60,242,180,.06)}
+.pn .ix{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:rgba(60,242,180,.1);color:var(--mint);font-size:12px;font-weight:600}
+.pn b{font-size:13.5px;font-weight:600;display:block}
+.pn span{font-size:12px;color:var(--mute)}
+.pn .vv{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink);text-align:right;white-space:nowrap}
+.sideBtns{display:flex;flex-wrap:wrap;gap:6px}
+.sideBtns button{height:36px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:12.5px;font-weight:500}
+.sideBtns button.on{background:rgba(60,242,180,.14);border-color:var(--mint);color:var(--mint)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+{
+/* =====================================================================
+   ALIGNA – architecture (single file, layered so the ESP32 can drop in)
+   1. Data sources     SimulatedImuSource | Esp32BleSource | Esp32WifiSource
+   2. Processing       PostureEstimator (calibration + complementary filter)
+   3. Classification   ThresholdClassifier (ML model can replace .classify)
+   4. Feedback         FeedbackController (sustained-posture → haptic)
+   5. Session          SessionTracker (durations, events, timeline)
+   6. Store            Engine (wires 1–5, exposes state to UI)
+   7. UI               React components (read-only view of the store)
+   ===================================================================== */
+const {useState,useEffect,useRef,useSyncExternalStore,useMemo,useCallback} = React;
+const html = htm.bind(React.createElement);
+const D2R = Math.PI/180, clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const noise=()=>(Math.random()+Math.random()+Math.random()-1.5)*0.9;
+const smooth01=x=>{x=clamp(x,0,1);return x*x*(3-2*x)};
+const store={get:(k,d)=>{try{const v=localStorage.getItem('aligna.'+k);return v?JSON.parse(v):d}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem('aligna.'+k,JSON.stringify(v))}catch(e){}}};
+
+const POSTURES={
+  upright:{label:'Upright',head:'Aligned',color:'#3CF2B4',kind:'good',msg:'Great! Your posture is aligned.'},
+  slouch:{label:'Forward slouch',head:'Slouching',color:'#FFB547',kind:'poor',msg:'Your upper body is leaning forward.'},
+  left:{label:'Left lean',head:'Leaning left',color:'#FF8A5B',kind:'poor',msg:'You are leaning to the left. Re-centre your shoulders.'},
+  right:{label:'Right lean',head:'Leaning right',color:'#FF8A5B',kind:'poor',msg:'You are leaning to the right. Re-centre your shoulders.'},
+  bend:{label:'Forward bending',head:'Bending forward',color:'#FF6B7A',kind:'poor',msg:'Deep forward bend. Hinge at the hips and keep your back long.'},
+  moving:{label:'Moving',head:'On the move',color:'#7CB8FF',kind:'active',msg:'Movement detected. Scoring pauses while you move.'}
+};
+const PKEYS=Object.keys(POSTURES);
+const SENS={relaxed:{slouch:15,lean:12,bend:40},balanced:{slouch:12,lean:10,bend:35},strict:{slouch:9,lean:7,bend:30}};
+
+/* ---------- 1a. Simulated IMU (MPU6050-like, 50 Hz) ----------
+   Axis convention (assumed, confirm against the real mounting):
+   X → wearer's right, Y → up along the spine, Z → out of the back.
+   Upright: a ≈ (0, +1 g, 0). Forward tilt rotates about X, lateral about Z. */
+class SimulatedImuSource{
+  constructor(){this.kind='simulated';this.label='Simulated IMU';this.rate=50;this.mode='auto';this.state='upright';this.t=0;
+    this.mount={p:5,r:2.2};this.p=this.mount.p;this.r=this.mount.r;this.prevP=this.p;this.prevR=this.r;this.target={p:0,r:0};this.dwell=7;this.timer=null}
+  setMode(m){this.mode=m;if(m==='auto')this.dwell=0.5;else this.enter(m)}
+  enter(st){this.state=st;const T={upright:[rnd(-1.2,1.2),rnd(-1.2,1.2)],slouch:[rnd(16,22),rnd(-2,2)],left:[rnd(2,5),-rnd(13,18)],right:[rnd(2,5),rnd(13,18)],bend:[rnd(44,56),rnd(-3,3)],moving:[8,0]}[st];
+    this.target={p:T[0],r:T[1]};this.dwell={upright:rnd(7,14),slouch:rnd(10,20),left:rnd(6,11),right:rnd(6,11),bend:rnd(4,7),moving:rnd(4,7)}[st]}
+  pickNext(){if(this.state!=='upright')return Math.random()<.85?'upright':'slouch';const w=[['slouch',45],['left',15],['right',15],['bend',12],['moving',13]];let x=Math.random()*100;for(const[k,v]of w){if((x-=v)<0)return k}return'slouch'}
+  start(cb){this.cb=cb;const dt=1/this.rate;this.timer=setInterval(()=>this.step(dt),1000/this.rate);return Promise.resolve()}
+  stop(){clearInterval(this.timer);this.timer=null}
+  step(dt){
+    this.t+=dt;
+    if(this.mode==='auto'){this.dwell-=dt;if(this.dwell<=0)this.enter(this.pickNext())}
+    const mv=this.state==='moving',tau=mv?.25:.75,k=1-Math.exp(-dt/tau);
+    let tp=this.target.p,tr=this.target.r;
+    if(mv){tp=10+16*Math.sin(this.t*4.4)+5*Math.sin(this.t*11);tr=9*Math.sin(this.t*2.8+1)}
+    tp+=.8*Math.sin(this.t*.13);
+    this.p+=(this.mount.p+tp-this.p)*k;this.r+=(this.mount.r+tr-this.r)*k;
+    const P=this.p+.5*Math.sin(this.t*1.57),R=this.r;
+    const gx=(P-this.prevP)/dt+.6+noise()*.35,gz=(R-this.prevR)/dt-.4+noise()*.35,gy=.25+noise()*.35+(mv?25*Math.sin(this.t*3.1):0);
+    this.prevP=P;this.prevR=R;
+    const lin=mv?.12*Math.sin(this.t*9.5):0;
+    const ax=Math.sin(R*D2R)*Math.cos(P*D2R)+noise()*.006+lin*.5,ay=Math.cos(R*D2R)*Math.cos(P*D2R)+noise()*.006+lin,az=Math.sin(P*D2R)+noise()*.006+lin*.7;
+    this.cb&&this.cb({t:this.t,ax,ay,az,gx,gy,gz,dt,src:'simulated'});
+  }
+}
+
+/* ---------- 1b. ESP32 over BLE (Web Bluetooth) – NOT yet configured ----------
+   Proposed packet (to agree with firmware): 12 bytes, little-endian int16
+   [ax, ay, az, gx, gy, gz] raw MPU6050 counts at defaults ±2 g (16384 LSB/g), ±250 °/s (131 LSB/°/s).
+   Fill serviceUuid / charUuid once the firmware defines its GATT service. */
+const BLE_CONFIG={namePrefix:'PostureSense',serviceUuid:null,charUuid:null,accelLsbPerG:16384,gyroLsbPerDps:131};
+class Esp32BleSource{
+  constructor(){this.kind='hardware';this.label='ESP32 · Bluetooth LE'}
+  static check(){
+    if(!('bluetooth' in navigator))return'Web Bluetooth is not available in this browser or preview frame. Use Chrome on Android/desktop over HTTPS, or a native app (React Native / Flutter BLE plugin).';
+    if(!BLE_CONFIG.serviceUuid)return'BLE service and characteristic UUIDs are not defined yet. Add them to BLE_CONFIG once the ESP32 firmware protocol is finalised.';
+    return null}
+  async start(cb){
+    const err=Esp32BleSource.check();if(err)throw new Error(err);
+    const dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:BLE_CONFIG.namePrefix}],optionalServices:[BLE_CONFIG.serviceUuid]});
+    const srv=await(await dev.gatt.connect()).getPrimaryService(BLE_CONFIG.serviceUuid);
+    const ch=await srv.getCharacteristic(BLE_CONFIG.charUuid);let last=performance.now();
+    ch.addEventListener('characteristicvaluechanged',e=>{const v=e.target.value,n=performance.now(),dt=(n-last)/1000;last=n;const g=i=>v.getInt16(i,true);
+      cb({t:n/1000,dt:clamp(dt,.005,.2),ax:g(0)/BLE_CONFIG.accelLsbPerG,ay:g(2)/BLE_CONFIG.accelLsbPerG,az:g(4)/BLE_CONFIG.accelLsbPerG,gx:g(6)/BLE_CONFIG.gyroLsbPerDps,gy:g(8)/BLE_CONFIG.gyroLsbPerDps,gz:g(10)/BLE_CONFIG.gyroLsbPerDps,src:'hardware'})});
+    await ch.startNotifications();this.dev=dev}
+  stop(){try{this.dev&&this.dev.gatt.disconnect()}catch(e){}}
+}
+/* ---------- 1c. ESP32 over Wi-Fi (WebSocket JSON) – alternative path ---------- */
+class Esp32WifiSource{
+  constructor(url){this.kind='hardware';this.label='ESP32 · Wi-Fi';this.url=url}
+  start(cb){return new Promise((ok,fail)=>{const ws=new WebSocket(this.url);this.ws=ws;ws.onopen=ok;ws.onerror=()=>fail(new Error('WebSocket connection failed (the preview frame blocks connections to other hosts).'));
+    ws.onmessage=e=>{try{const d=JSON.parse(e.data);cb({...d,dt:d.dt||.02,src:'hardware'})}catch(x){}}})}
+  stop(){try{this.ws&&this.ws.close()}catch(e){}}
+}
+/* ---------- 1d. iPhone / iPad motion sensors (REAL data, but not the PostureSense hardware) ----------
+   Safari DeviceMotion: accelerationIncludingGravity (m/s²) + rotationRate (°/s), ~60 Hz.
+   Phone axes: x → screen right, y → screen top, z → out of the screen. Strapped to the back with the
+   screen facing out and the top toward the head, these match ALIGNA's X/Y/Z. Signs are auto-aligned. */
+class PhoneImuSource{
+  constructor(inv){this.kind='phone';this.label='iPhone motion sensors';this.inv=inv;this.accSign=0;this.sx=1;this.sz=1;this.cx=0;this.cz=0;this.seen=0}
+  static async permit(){
+    if(!('DeviceMotionEvent' in window))throw new Error('This browser gives no access to motion sensors.');
+    if(!window.isSecureContext)throw new Error('Motion sensors need an HTTPS page. Open the GitHub Pages link in Safari.');
+    if(typeof DeviceMotionEvent.requestPermission==='function'){const r=await DeviceMotionEvent.requestPermission();
+      if(r!=='granted')throw new Error('Motion access was denied. Close the tab, reopen the page and tap Allow, or check Settings › Apps › Safari › Motion & Orientation Access.')}}
+  start(cb){return new Promise((ok,fail)=>{let last=0;
+    const to=setTimeout(()=>{if(!this.seen){this.stop();fail(new Error('No motion data arrived. Sensors only work when the hosted HTTPS page is opened in Safari on the iPhone; the Claude preview blocks them.'))}},2500);
+    this.h=e=>{const a=e.accelerationIncludingGravity,g=e.rotationRate||{};if(!a||a.x==null)return;
+      const n=performance.now(),dt=last?clamp((n-last)/1000,.005,.1):1/60;last=n;
+      let ax=a.x/9.80665,ay=a.y/9.80665,az=a.z/9.80665;
+      if(!this.accSign&&Math.abs(ay)>.5)this.accSign=Math.sign(ay);   // make "up the spine" read +1 g whatever the platform's sign convention
+      const sg=this.accSign||1;ax*=sg;ay*=sg;az*=sg;
+      let gx=g.beta||0,gy=g.gamma||0,gz=g.alpha||0;
+      const pa=Math.atan2(az,Math.hypot(ax,ay))/D2R,ra=Math.atan2(ax,ay)/D2R;  // auto-align gyro sign with accelerometer angle rates
+      if(this.pp!==undefined){const dp=(pa-this.pp)/dt,dr=(ra-this.pr)/dt;
+        if(Math.abs(gx)>8&&Math.abs(dp)>4)this.cx=clamp(this.cx+Math.sign(dp*gx),-40,40);if(Math.abs(gz)>8&&Math.abs(dr)>4)this.cz=clamp(this.cz+Math.sign(dr*gz),-40,40);
+        if(this.cx<-12)this.sx=-1;if(this.cx>12)this.sx=1;if(this.cz<-12)this.sz=-1;if(this.cz>12)this.sz=1}
+      this.pp=pa;this.pr=ra;gx*=this.sx;gz*=this.sz;
+      if(this.inv.invFwd){az=-az;gx=-gx}if(this.inv.invLat){ax=-ax;gz=-gz}
+      if(!this.seen++){clearTimeout(to);ok()}
+      cb({t:n/1000,dt,ax,ay,az,gx,gy,gz,src:'phone'})};
+    window.addEventListener('devicemotion',this.h)})}
+  stop(){window.removeEventListener('devicemotion',this.h)}
+}
+/* iPhone has no web vibration API, so nudges become a chime and/or spoken cue */
+let actx=null;
+function unlockAudio(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();actx.resume();const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}}
+function chime(){if(!actx)return;try{const t=actx.currentTime,v=.05+.45*S.settings.vibIntensity/100;[0,.2].forEach((d,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=i?880:660;
+  g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(v,t+d+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d+.3);o.connect(g).connect(actx.destination);o.start(t+d);o.stop(t+d+.35)})}catch(e){}}
+function speak(t){try{const u=new SpeechSynthesisUtterance(t);speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+let wakeLock=null;
+async function keepAwake(on){try{if(on&&'wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen')}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.link.kind==='phone'&&S.link.status==='streaming')keepAwake(true)});
+const SRC={simulated:{chip:'Demo stream',sub:'simulated',tag:'SIMULATED',ico:'flask',title:'DEMO DATA · simulated IMU',body:'Generated in the app to mimic an MPU6050. These are not measurements from your device.',transport:'In-app simulator',imu:'MPU6050 model · simulated',data:'simulated data'},
+  phone:{chip:'iPhone live',sub:'real sensors',tag:'IPHONE IMU',ico:'dev',title:'REAL DATA · iPhone motion sensors',body:"Live readings from this iPhone's accelerometer and gyroscope. Real data, but not the PostureSense hardware.",transport:'Built-in (Safari DeviceMotion)',imu:'iPhone accelerometer + gyroscope',data:'iPhone sensor data'},
+  ble:{chip:'ESP32 live',sub:'BLE',tag:'HARDWARE',ico:'bt',title:'HARDWARE DATA · ESP32',body:'Readings received from the connected wearable.',transport:'Bluetooth LE',imu:'MPU6050 · responding',data:'device data'}};
+SRC.remote={chip:'iPhone via link',sub:'live link',tag:'IPHONE · LINKED',ico:'wifi',title:'REAL DATA · iPhone sensors over live link',body:"Streaming from the paired iPhone's accelerometer and gyroscope. Real data, but not the PostureSense hardware.",transport:'WebRTC peer-to-peer',imu:'iPhone accelerometer + gyroscope (remote)',data:'linked iPhone data'};
+const src=()=>SRC[S.link.kind]||SRC.ble;
+
+/* ---------- 1e. Live link: iPhone (sensor) → iPad (display) over WebRTC via PeerJS ----------
+   The free PeerJS cloud server only introduces the two devices; samples then flow peer-to-peer. */
+const PEER_PREFIX='aligna-ps-',PEER_OPTS=Object.assign({debug:0},window.ALIGNA_PEER_OPTS||{});
+let peerLib=null;
+function loadPeer(){if(window.Peer)return Promise.resolve(window.Peer);if(peerLib)return peerLib;
+  peerLib=new Promise((ok,fail)=>{const sc=document.createElement('script');sc.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    sc.onload=()=>window.Peer?ok(window.Peer):fail(new Error('The link library did not load.'));sc.onerror=()=>{peerLib=null;fail(new Error('Could not load the link library. Check the internet connection.'))};document.head.appendChild(sc)});return peerLib}
+const newCode=()=>Array.from({length:4},()=>'ACDEFGHJKMNPQRTUVWXY'[Math.floor(Math.random()*20)]).join('');
+function peerErr(e){const t=e&&e.type;return t==='browser-incompatible'?'This browser does not support WebRTC.':['network','server-error','socket-error','socket-closed'].includes(t)?'Cannot reach the pairing server. Check the internet connection on this device.':t==='peer-unavailable'?'No iPhone is sharing with that code. Check the code on the iPhone.':(e&&e.message)||'Link error.'}
+function remoteCue(m){if(m.k==='nudge'){if(S.settings.sound)chime();if(S.settings.voice)speak('Straighten up.');shakeFn&&shakeFn();toast(`Nudge from display · ${m.text||''}`,'#FFB547','vib')}else if(m.k==='say'){speak(m.text)}}
+const Share={peer:null,conns:[],code:null,status:'off',err:null,buf:[],timer:null,
+  async start(){this.stop();this.err=null;this.status='starting';
+    try{const P=await loadPeer();this.code=newCode();const peer=new P(PEER_PREFIX+this.code,PEER_OPTS);this.peer=peer;
+      peer.on('open',()=>{this.status=this.conns.length?'live':'waiting'});
+      peer.on('connection',c=>{c.on('open',()=>{this.conns.push(c);this.status='live';c.send({k:'hello',mount:S.settings.phoneMount});toast('Display connected · streaming live')});
+        c.on('data',m=>m&&remoteCue(m));
+        c.on('close',()=>{this.conns=this.conns.filter(x=>x!==c);if(!this.conns.length&&this.status==='live'){this.status='waiting';toast('Display disconnected','#FF6B7A','x')}})});
+      peer.on('disconnected',()=>{try{if(this.peer===peer&&!peer.destroyed)peer.reconnect()}catch(e){}});
+      peer.on('error',e=>{if(e.type==='unavailable-id'){this.start();return}this.err=peerErr(e);if(!this.conns.length)this.status='error'});
+      this.timer=setInterval(()=>this.flush(),40);
+    }catch(e){this.status='error';this.err=e.message}},
+  push(x){if(this.status==='live'){this.buf.push([x.t,x.dt,x.ax,x.ay,x.az,x.gx,x.gy,x.gz].map(v=>Math.round(v*1e4)/1e4));if(this.buf.length>200)this.buf.shift()}},
+  flush(){if(!this.buf.length)return;const d=this.buf;this.buf=[];for(const c of this.conns){try{c.open&&c.send({k:'s',d})}catch(e){}}},
+  stop(){clearInterval(this.timer);this.timer=null;try{this.peer&&this.peer.destroy()}catch(e){}this.peer=null;this.conns=[];this.status='off';this.code=null;this.buf=[]}
+};
+class RemoteSource{
+  constructor(code){this.kind='remote';this.code=String(code||'').toUpperCase().replace(/[^A-Z]/g,'');this.label='Paired iPhone · '+this.code;this.last=0}
+  async start(cb){if(this.code.length!==4)throw new Error('Enter the 4-letter code shown on the iPhone.');const P=await loadPeer();
+    return new Promise((ok,fail)=>{let done=false;const peer=new P(undefined,PEER_OPTS);this.peer=peer;
+      const to=setTimeout(()=>{if(!done){done=true;this.stop();fail(new Error('Timed out. Check the code, keep the iPhone app open, and put both devices on the same Wi-Fi or hotspot.'))}},15000);
+      peer.on('error',e=>{if(!done){done=true;clearTimeout(to);this.stop();fail(new Error(peerErr(e)))}});
+      peer.on('open',()=>{const c=peer.connect(PEER_PREFIX+this.code,{serialization:'json'});this.conn=c;
+        c.on('open',()=>{if(done)return;done=true;clearTimeout(to);this.last=performance.now();ok();
+          this.watch=setInterval(()=>{if(performance.now()-this.last>4000)this.lost('No data for 4 s. The iPhone may have locked or lost its connection.')},1000)});
+        c.on('data',m=>{if(!m)return;this.last=performance.now();if(m.k==='s'){for(const r of m.d)cb({t:r[0],dt:r[1],ax:r[2],ay:r[3],az:r[4],gx:r[5],gy:r[6],gz:r[7],src:'remote'})}else if(m.k==='hello')this.mount=m.mount});
+        c.on('close',()=>this.lost('The iPhone stopped sharing.'))})})}
+  lost(why){if(source!==this)return;this.stop();source=null;keepAwake(false);S.link={...S.link,status:'disconnected',err:why};toast('Live link lost','#FF6B7A','x')}
+  send(m){try{this.conn&&this.conn.open&&this.conn.send(m)}catch(e){}}
+  stop(){clearInterval(this.watch);try{this.peer&&this.peer.destroy()}catch(e){}}
+}
+
+/* ---------- 2. Estimation: calibration + complementary filter ---------- */
+class PostureEstimator{
+  constructor(){this.alpha=.98;this.p=null;this.r=null}
+  reset(){this.p=this.r=null}
+  update(s){const pa=Math.atan2(s.az,Math.hypot(s.ax,s.ay))/D2R,ra=Math.atan2(s.ax,s.ay)/D2R;
+    if(this.p===null){this.p=pa;this.r=ra}
+    this.p=this.alpha*(this.p+s.gx*s.dt)+(1-this.alpha)*pa;this.r=this.alpha*(this.r+s.gz*s.dt)+(1-this.alpha)*ra;
+    return{pAbs:this.p,rAbs:this.r,pAcc:pa,rAcc:ra}}
+}
+/* ---------- 3. Threshold classifier (baseline; ML can replace classify) ---------- */
+class ThresholdClassifier{
+  constructor(){this.name='Threshold rules (v0)';this.cur='upright';this.cand='upright';this.candT=0;this.motion=0;this.accDev=0;this.rule=''}
+  classify(f,th,dt){
+    const k=1-Math.exp(-dt/.5);this.motion+=(f.gyroMag-this.motion)*k;this.accDev+=(Math.abs(f.accMag-1)-this.accDev)*k;
+    let c;
+    if(this.motion>30||this.accDev>.06){c='moving';this.rule=`|ω| ${this.motion.toFixed(0)}°/s > 30 → movement`}
+    else if(f.p>th.bend){c='bend';this.rule=`tilt ${f.p.toFixed(1)}° > ${th.bend}° → forward bending`}
+    else if(f.p>th.slouch){c='slouch';this.rule=`tilt ${f.p.toFixed(1)}° > ${th.slouch}° → forward slouch`}
+    else if(f.r<-th.lean){c='left';this.rule=`lateral ${f.r.toFixed(1)}° < −${th.lean}° → left lean`}
+    else if(f.r>th.lean){c='right';this.rule=`lateral ${f.r.toFixed(1)}° > ${th.lean}° → right lean`}
+    else{c='upright';this.rule=`|tilt| within ${th.slouch}°, |lateral| within ${th.lean}° → upright`}
+    if(c!==this.cand){this.cand=c;this.candT=0}else this.candT+=dt;
+    if(this.cand!==this.cur&&this.candT>=.4)this.cur=this.cand;  // 0.4 s debounce
+    return this.cur}
+}
+/* App-defined alignment score (not a clinical measure) */
+function alignScore(p,r){return clamp(100-2.3*Math.max(0,p-4)-1.6*Math.max(0,-p-6)-2.5*Math.max(0,Math.abs(r)-3),0,100)}
+
+/* ---------- 5. Session tracker ---------- */
+function newSession(){return{id:Date.now(),startedAt:new Date(),elapsed:0,running:true,time:Object.fromEntries(PKEYS.map(k=>[k,0])),scoreSum:0,scoreT:0,
+  events:{slouch:0,left:0,right:0,bend:0},alerts:0,longestGood:0,goodStreak:0,segs:[],hist:[],histT:0}}
+
+/* ---------- 6. Engine / store ---------- */
+const BUFN=750;
+const S={
+  settings:Object.assign({name:'Nitin',sensitivity:'balanced',alertDelay:10,vibOn:true,vibIntensity:70,vibPattern:'pulse',banners:true,dailySummary:true,weekly:false,units:'deg',goalMin:240,targetScore:80,phoneMount:'back',invFwd:false,invLat:false,sound:true,voice:true},store.get('settings',{})),
+  onboarded:store.get('onboarded',false),
+  calib:store.get('calib',{done:false,p:0,r:0,at:null}),
+  link:{status:'disconnected',kind:'simulated',label:'Simulated IMU',err:null},
+  battery:78,samples:0,rateHz:0,
+  live:{ax:0,ay:1,az:0,gx:0,gy:0,gz:0,pAbs:0,rAbs:0,p:0,r:0,gyroMag:0,cls:'upright',rule:'',score:90,since:0,bad:0},
+  score:90,sess:newSession(),saved:store.get('saved',[]),
+  fb:{bad:0,fired:false,hapticAt:0},
+  buf:{n:0,head:0,ch:Object.fromEntries(['t','ax','ay','az','gx','gy','gz','p','r'].map(k=>[k,new Float32Array(BUFN)]))},
+  livePaused:false,calibCollect:null,toasts:[],now:0
+};
+const sim=new SimulatedImuSource(),est=new PostureEstimator(),clf=new ThresholdClassifier();
+let source=null,ver=0;const subs=new Set();
+const subscribe=f=>{subs.add(f);return()=>subs.delete(f)};const getVer=()=>ver;
+setInterval(()=>{ver++;subs.forEach(f=>f())},80);
+const saveSettings=()=>store.set('settings',S.settings);
+let toastId=0;
+function toast(text,color='#3CF2B4',icon='check'){const t={id:++toastId,text,color,icon};S.toasts=[...S.toasts,t].slice(-3);setTimeout(()=>{S.toasts=S.toasts.filter(x=>x!==t)},3200)}
+const rateWin=[];
+function onSample(s){
+  if(s.src==='phone')Share.push(s);
+  S.samples++;S.now=s.t;const nowMs=performance.now();rateWin.push(nowMs);while(rateWin[0]<nowMs-1000)rateWin.shift();S.rateHz=rateWin.length;
+  if(s.src==='simulated')S.battery=Math.max(5,S.battery-1/(50*90));
+  const a=est.update(s),p=a.pAbs-S.calib.p,r=a.rAbs-S.calib.r;
+  const gyroMag=Math.hypot(s.gx,s.gy,s.gz),accMag=Math.hypot(s.ax,s.ay,s.az);
+  if(S.calibCollect)S.calibCollect.push({p:a.pAbs,r:a.rAbs,g:gyroMag});
+  const prev=S.live.cls,th=SENS[S.settings.sensitivity],cls=clf.classify({p,r,gyroMag,accMag},th,s.dt);
+  const k=1-Math.exp(-s.dt/1.5);if(cls!=='moving')S.score+=(alignScore(p,r)-S.score)*k;
+  const L=S.live;Object.assign(L,{ax:s.ax,ay:s.ay,az:s.az,gx:s.gx,gy:s.gy,gz:s.gz,pAbs:a.pAbs,rAbs:a.rAbs,p,r,gyroMag,cls,rule:clf.rule,score:S.score});
+  if(cls!==prev){L.since=0;const ss=S.sess;if(ss.running&&ss.events[cls]!==undefined)ss.events[cls]++}else L.since+=s.dt;
+  // 4. feedback controller
+  const kind=POSTURES[cls].kind;
+  if(kind==='poor'){S.fb.bad+=s.dt;if(!S.fb.fired&&S.fb.bad>=S.settings.alertDelay){S.fb.fired=true;fireHaptic(`${POSTURES[cls].label} held for ${Math.round(S.fb.bad)} s`)}}
+  else if(kind==='good'){S.fb.bad=0;S.fb.fired=false}
+  L.bad=S.fb.bad;
+  // 5. session
+  const ss=S.sess;if(ss.running){ss.elapsed+=s.dt;ss.time[cls]+=s.dt;if(kind!=='active'){ss.scoreSum+=S.score*s.dt;ss.scoreT+=s.dt}
+    if(kind==='good'){ss.goodStreak+=s.dt;ss.longestGood=Math.max(ss.longestGood,ss.goodStreak)}else if(kind==='poor')ss.goodStreak=0;
+    const last=ss.segs[ss.segs.length-1];if(last&&last.c===cls)last.t1=ss.elapsed;else ss.segs.push({c:cls,t0:ss.elapsed-s.dt,t1:ss.elapsed});
+    ss.histT+=s.dt;if(ss.histT>=1){ss.histT=0;ss.hist.push(S.score)}}
+  // ring buffer for charts
+  if(!S.livePaused){const b=S.buf;const vals={t:s.t,ax:s.ax,ay:s.ay,az:s.az,gx:s.gx,gy:s.gy,gz:s.gz,p,r};for(const key in vals)b.ch[key][b.head]=vals[key];b.head=(b.head+1)%BUFN;b.n=Math.min(BUFN,b.n+1)}
+}
+let shakeFn=null;
+function fireHaptic(reason,test){
+  S.fb.hapticAt=performance.now();if(!test&&S.sess.running)S.sess.alerts++;
+  if(S.link.kind==='remote'){source&&source.send&&source.send({k:'nudge',text:reason});shakeFn&&shakeFn();
+    if(S.settings.banners||test)toast(`Nudge sent to iPhone · ${reason}`,'#FFB547','vib');return}
+  if(S.link.kind==='phone'&&!test&&Share.conns.length)return;   // the linked display decides when to nudge
+  if(S.link.kind==='phone'){if(S.settings.sound)chime();if(S.settings.voice)speak(test?'This is a posture nudge.':'Straighten up.');shakeFn&&shakeFn();
+    if(S.settings.banners||test)toast(`Audio nudge · ${reason}`,'#FFB547','vib');return}
+  if(S.settings.vibOn){const ms=Math.round(80+S.settings.vibIntensity*2.2),pat={pulse:[ms],double:[ms,90,ms],long:[ms*2.2]}[S.settings.vibPattern];try{navigator.vibrate&&navigator.vibrate(pat)}catch(e){}shakeFn&&shakeFn()}
+  if(S.settings.banners||test)toast(S.settings.vibOn?`Haptic nudge${S.link.kind==='simulated'?' (simulated)':''} · ${reason}`:`Alert (vibration off) · ${reason}`,'#FFB547','vib');
+}
+async function connect(kind,arg){
+  if(source){source.stop();source=null}
+  keepAwake(false);
+  S.link={status:'connecting',kind,label:kind==='simulated'?'Simulated IMU':kind==='phone'?'iPhone motion sensors':kind==='remote'?'Paired iPhone':'ESP32 · Bluetooth LE',err:null};
+  if(kind!=='phone'&&Share.status!=='off')Share.stop();
+  try{
+    if(kind==='phone'){unlockAudio();await PhoneImuSource.permit();source=new PhoneImuSource(S.settings)}   // permit() must be the first await: iOS needs the tap gesture
+    else if(kind==='remote'){unlockAudio();source=new RemoteSource(arg);S.link.label=source.label}
+    else if(kind==='simulated'){await new Promise(r=>setTimeout(r,1300));source=sim}
+    else{const err=Esp32BleSource.check();if(err)throw new Error(err);source=new Esp32BleSource()}
+    est.reset();clf.cur=clf.cand='upright';await source.start(onSample);S.link.status='streaming';
+    if(kind==='phone'||kind==='remote'){keepAwake(true);S.calib={done:false,p:0,r:0,at:null};store.set('calib',S.calib);S.sess=newSession()}
+    toast(kind==='simulated'?'Demo source streaming · simulated data':kind==='phone'?'iPhone sensors live · now calibrate':kind==='remote'?'Linked to iPhone · now calibrate':'ESP32 connected');
+  }catch(e){S.link={status:'disconnected',kind,label:S.link.label,err:e.message};toast(kind==='simulated'?'Could not start demo source':kind==='phone'?'iPhone sensors unavailable · see Device tab':kind==='remote'?'Could not link · see Device tab':'ESP32 not connected · see Device notes','#FF6B7A','x');source=null}
+}
+function disconnect(){keepAwake(false);if(Share.status!=='off')Share.stop();if(source)source.stop();source=null;S.link={...S.link,status:'disconnected',err:null};toast('Data stream stopped','#8EB2AF','x')}
+connect('simulated');
+
+/* ---------- formatting ---------- */
+const fmtT=s=>{s=Math.max(0,Math.floor(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`};
+const fmtA=(d,dp=1)=>S.settings.units==='rad'?`${(d*D2R).toFixed(3)} rad`:`${d.toFixed(dp)}°`;
+const scoreWord=s=>s>=85?'Excellent alignment':s>=70?'Good alignment':s>=50?'Fair, room to improve':'Needs attention';
+const useTick=()=>useSyncExternalStore(subscribe,getVer);
+
+/* =========================== UI =========================== */
+const IC={
+  home:html`<path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z"/>`,
+  live:html`<path d="M3 12h4l3-7 4 14 3-7h4"/>`,
+  sess:html`<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>`,
+  trend:html`<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`,
+  dev:html`<rect x="6" y="3" width="12" height="18" rx="5"/><circle cx="12" cy="9" r="2"/><path d="M10 15h4"/>`,
+  user:html`<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>`,
+  bt:html`<path d="M7 7l10 10-5 4V3l5 4L7 17"/>`,
+  wifi:html`<path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0"/><circle cx="12" cy="19" r="1"/>`,
+  play:html`<path d="M7 4l13 8-13 8z"/>`,pause:html`<path d="M7 4v16M17 4v16"/>`,
+  reset:html`<path d="M3 12a9 9 0 103-6.7L3 8M3 3v5h5"/>`,check:html`<path d="M4 12l5 5L20 6"/>`,x:html`<path d="M6 6l12 12M18 6L6 18"/>`,
+  back:html`<path d="M15 5l-7 7 7 7"/>`,chev:html`<path d="M9 5l7 7-7 7"/>`,
+  vib:html`<rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4 8v8M20 8v8M1 10v4M23 10v4"/>`,
+  target:html`<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>`,
+  save:html`<path d="M5 3h11l3 3v15H5zM8 3v6h8"/>`,plus:html`<path d="M12 5v14M5 12h14"/>`,
+  sliders:html`<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>`,
+  flask:html`<path d="M9 3h6M10 3v6L4 19a1 1 0 001 2h14a1 1 0 001-2l-6-10V3"/>`
+};
+const Icon=({n,s=22,w=1.8,style})=>html`<svg viewBox="0 0 24 24" width=${s} height=${s} fill="none" stroke="currentColor" strokeWidth=${w} strokeLinecap="round" strokeLinejoin="round" style=${style}>${IC[n]}</svg>`;
+
+const Logo=({s=40})=>html`<svg width=${s} height=${s} viewBox="0 0 48 48" aria-label="ALIGNA logo">
+    <rect width="48" height="48" rx="14" fill="#0E2E33"/><rect x=".5" y=".5" width="47" height="47" rx="13.5" fill="none" stroke="rgba(60,242,180,.35)"/>
+  <path d="M12 37L24 10l12 27" fill="none" stroke="#3CF2B4" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round"/>
+  <rect x="15.5" y="26" width="17" height="6" rx="3" fill="none" stroke="#E9F7F4" strokeWidth="1.8"/><circle cx="24" cy="29" r="1.8" fill="#3CF2B4"/></svg>`;
+
+/* ---------- smooth path helpers ---------- */
+function spath(pts,closed){const n=pts.length;if(n<2)return'';const P=i=>closed?pts[(i+n)%n]:pts[clamp(i,0,n-1)];let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  const last=closed?n:n-1;for(let i=0;i<last;i++){const p0=P(i-1),p1=P(i),p2=P(i+1),p3=P(i+2);
+    d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}
+  return d+(closed?'Z':'')}
+function sideGeom(P){
+  const hipFrac=P<0?.8:.35+.45*smooth01((P-22)/22),hip=P*hipFrac,curv=(P-hip)/.8,nat=[-7,-4,1,5,6,2];
+  let x=88,y=190;const pts=[[x,y]],ang=[];
+  for(let i=0;i<6;i++){const th=(hip+curv*i/5+nat[i]*(1+Math.max(0,P)/50))*D2R;ang.push(th);x+=18.5*Math.sin(th);y-=18.5*Math.cos(th);pts.push([x,y])}
+  const nth=(ang[5]/D2R+Math.max(0,P)*.55+4)*D2R,neck=[x+13*Math.sin(nth),y-13*Math.cos(nth)],head=[neck[0]+15*Math.sin(nth)+4,neck[1]-15*Math.cos(nth)];
+  return{pts,ang,neck,head,nth}}
+function backGeom(R){
+  let x=100,y=190;const pts=[[x,y]],ang=[];
+  for(let i=0;i<6;i++){const th=R*(.2+.8*Math.pow(i/5,1.2))*D2R;ang.push(th);x+=18.5*Math.sin(th);y-=18.5*Math.cos(th);pts.push([x,y])}
+  const nth=ang[5]*.7,neck=[x+12*Math.sin(nth),y-12*Math.cos(nth)],head=[neck[0]+16*Math.sin(nth),neck[1]-16*Math.cos(nth)];
+  return{pts,ang,neck,head,nth}}
+const nrm=th=>[Math.cos(th),Math.sin(th)];
+
+function SideFigure({P,color,haptic,dim,uid}){
+  const g=sideGeom(P),g0=sideGeom(0),A=i=>g.ang[Math.min(i,5)];
+  const wb=[17,14,12,13,15,15,9],wf=[19,15,15,19,22,19,9];
+  const front=g.pts.map((p,i)=>{const n=nrm(A(i));return[p[0]+n[0]*wf[i],p[1]+n[1]*wf[i]]}),back=g.pts.map((p,i)=>{const n=nrm(A(i));return[p[0]-n[0]*wb[i],p[1]-n[1]*wb[i]]});
+  const nn=nrm(g.nth),body=[[g.pts[0][0]-20,g.pts[0][1]+10],[g.pts[0][0]+22,g.pts[0][1]+12],...front,[g.neck[0]+nn[0]*7,g.neck[1]+nn[1]*7],[g.neck[0]-nn[0]*7,g.neck[1]-nn[1]*7],...back.reverse()];
+  const sp=(G)=>G.pts.map((p,i)=>{const n=nrm(G.ang[Math.min(i,5)]);return[p[0]-n[0]*wb[i]*.45,p[1]-n[1]*wb[i]*.45]});
+  const spine=sp(g),ghost=sp(g0);
+  const n5=nrm(A(5)),sh=[g.pts[5][0]+n5[0]*3,g.pts[5][1]+n5[1]*3],el=[sh[0]+6+Math.max(0,P)*.5,sh[1]+50],hd=[el[0]+34,el[1]-6];
+  const th4=A(4),n4=nrm(th4),sx=(g.pts[4][0]+g.pts[5][0])/2-n4[0]*(wb[4]+2),sy=(g.pts[4][1]+g.pts[5][1])/2-n4[1]*(wb[4]+2);
+  const L=34,ex=sx+L*Math.sin(th4),ey=sy-L*Math.cos(th4),arcR=24,ax1=sx,ay1=sy-arcR,ax2=sx+arcR*Math.sin(th4),ay2=sy-arcR*Math.cos(th4);
+  const c=dim?'#5E807D':color;
+  return html`<svg viewBox="0 0 200 262" role="img" aria-label=${`Side view, forward tilt ${P.toFixed(0)} degrees`}>
+    <defs><linearGradient id=${'bd'+uid} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2A5862"/><stop offset="1" stopColor="#163840"/></linearGradient>
+      <radialGradient id=${'gl'+uid}><stop offset="0" stopColor=${c} stopOpacity=".35"/><stop offset="1" stopColor=${c} stopOpacity="0"/></radialGradient>
+      <filter id=${'f'+uid} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter></defs>
+    <ellipse cx="100" cy="252" rx="78" ry="6" fill="rgba(0,0,0,.35)"/>
+    <line x1=${88} y1="230" x2=${88} y2="22" stroke="rgba(233,247,244,.18)" strokeDasharray="3 5"/>
+    <text x="92" y="26" fontSize="8.5" fill="rgba(233,247,244,.45)">neutral</text>
+    <rect x="52" y="206" width="70" height="8" rx="4" fill="#1E4048"/><rect x="83" y="214" width="8" height="34" rx="3" fill="#163238"/>
+    <path d=${`M${g.pts[0][0]} ${g.pts[0][1]+6}L150 202`} stroke=${`url(#bd${uid})`} strokeWidth="27" strokeLinecap="round"/>
+    <path d="M150 202L153 246" stroke="#1D444C" strokeWidth="19" strokeLinecap="round"/><path d="M152 248h20" stroke="#1D444C" strokeWidth="9" strokeLinecap="round"/>
+    <path d=${spath(body,true)} fill=${`url(#bd${uid})`} stroke="rgba(150,235,220,.22)" strokeWidth="1"/>
+    <circle cx=${g.head[0]} cy=${g.head[1]} r="17" fill=${`url(#bd${uid})`} stroke="rgba(150,235,220,.22)"/>
+    <path d=${`M${sh[0]} ${sh[1]}L${el[0]} ${el[1]}L${hd[0]} ${hd[1]}`} fill="none" stroke="#071A1F" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d=${`M${sh[0]} ${sh[1]}L${el[0]} ${el[1]}L${hd[0]} ${hd[1]}`} fill="none" stroke="#2C5D67" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d=${spath(ghost)} fill="none" stroke="rgba(233,247,244,.3)" strokeWidth="2" strokeDasharray="2 4"/>
+    <path d=${spath(spine)} fill="none" stroke=${c} strokeWidth="5" opacity=".55" filter=${`url(#f${uid})`}/>
+    <path d=${spath(spine)} fill="none" stroke=${c} strokeWidth="2.2" strokeLinecap="round"/>
+    ${spine.map((p,i)=>html`<circle key=${i} cx=${p[0]} cy=${p[1]} r="3.2" fill="#071A1F" stroke=${c} strokeWidth="1.6"/>`)}
+    <circle cx=${sx} cy=${sy} r="26" fill=${`url(#gl${uid})`}/>
+    ${haptic&&html`<circle cx=${sx} cy=${sy} r="8" fill="none" stroke="#FFB547" strokeWidth="2"><animate attributeName="r" from="8" to="30" dur=".7s" repeatCount="3"/><animate attributeName="opacity" from="1" to="0" dur=".7s" repeatCount="3"/></circle>`}
+    <line x1=${sx} y1=${sy} x2=${sx} y2=${sy-L} stroke="rgba(233,247,244,.35)" strokeDasharray="2 3"/>
+    <line x1=${sx} y1=${sy} x2=${ex} y2=${ey} stroke=${c} strokeWidth="1.6"/>
+    <path d=${`M${ax1} ${ay1}A${arcR} ${arcR} 0 0 ${th4>0?1:0} ${ax2} ${ay2}`} fill="none" stroke=${c} strokeWidth="1.4"/>
+    <g transform=${`rotate(${th4/D2R} ${sx} ${sy})`}><rect x=${sx-5} y=${sy-9} width="10" height="18" rx="4" fill="#0B2228" stroke=${c} strokeWidth="1.6"/><circle cx=${sx} cy=${sy-3} r="1.6" fill=${c}/></g>
+  </svg>`}
+
+function BackFigure({R,color,dim,uid}){
+  const g=backGeom(R),A=i=>g.ang[Math.min(i,5)],w=[31,26,23,26,32,40,9];
+  const right=g.pts.map((p,i)=>{const n=nrm(A(i));return[p[0]+n[0]*w[i],p[1]+n[1]*w[i]]}),left=g.pts.map((p,i)=>{const n=nrm(A(i));return[p[0]-n[0]*w[i],p[1]-n[1]*w[i]]});
+  const nn=nrm(g.nth),body=[[g.pts[0][0]-32,g.pts[0][1]+12],[g.pts[0][0]+32,g.pts[0][1]+12],...right,[g.neck[0]+nn[0]*7,g.neck[1]+nn[1]*7],[g.neck[0]-nn[0]*7,g.neck[1]-nn[1]*7],...left.reverse()];
+  const n5=nrm(A(5)),shR=[g.pts[5][0]+n5[0]*36,g.pts[5][1]+n5[1]*36+4],shL=[g.pts[5][0]-n5[0]*36,g.pts[5][1]-n5[1]*36+4];
+  const arm=(s,d)=>`M${s[0]} ${s[1]}L${s[0]+d*5} ${s[1]+48}L${s[0]+d*3} ${s[1]+90}`;
+  const c=dim?'#5E807D':color,sp=g.pts,th4=A(4),sx=(sp[4][0]+sp[5][0])/2,sy=(sp[4][1]+sp[5][1])/2;
+  const yS=Math.min(shL[1],shR[1]);
+  return html`<svg viewBox="0 0 200 262" role="img" aria-label=${`Back view, lateral tilt ${R.toFixed(0)} degrees`}>
+    <defs><linearGradient id=${'bb'+uid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2A5862"/><stop offset="1" stopColor="#163840"/></linearGradient>
+      <filter id=${'fb'+uid} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter></defs>
+    <ellipse cx="100" cy="252" rx="78" ry="6" fill="rgba(0,0,0,.35)"/>
+    <rect x="58" y="204" width="84" height="10" rx="5" fill="#1E4048"/><rect x="66" y="214" width="7" height="34" rx="3" fill="#163238"/><rect x="127" y="214" width="7" height="34" rx="3" fill="#163238"/>
+    <line x1="100" y1="232" x2="100" y2="20" stroke="rgba(233,247,244,.18)" strokeDasharray="3 5"/>
+    <line x1="40" y1=${yS} x2="160" y2=${yS} stroke="rgba(233,247,244,.14)" strokeDasharray="3 5"/>
+    ${[shL,shR].map((s,i)=>html`<path key=${i} d=${arm(s,i?1:-1)} fill="none" stroke="#1F4850" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round"/>`)}
+    <path d=${spath(body,true)} fill=${`url(#bb${uid})`} stroke="rgba(150,235,220,.22)" strokeWidth="1"/>
+    <circle cx=${g.head[0]} cy=${g.head[1]} r="17" fill=${`url(#bb${uid})`} stroke="rgba(150,235,220,.22)"/>
+    <line x1=${shL[0]} y1=${shL[1]-4} x2=${shR[0]} y2=${shR[1]-4} stroke=${c} strokeWidth="1.6" strokeDasharray="1 3" strokeLinecap="round"/>
+    <path d=${spath(sp)} fill="none" stroke=${c} strokeWidth="5" opacity=".55" filter=${`url(#fb${uid})`}/>
+    <path d=${spath(sp)} fill="none" stroke=${c} strokeWidth="2.2"/>
+    ${sp.map((p,i)=>html`<circle key=${i} cx=${p[0]} cy=${p[1]} r="3.2" fill="#071A1F" stroke=${c} strokeWidth="1.6"/>`)}
+    <g transform=${`rotate(${th4/D2R} ${sx} ${sy})`}><rect x=${sx-9} y=${sy-6} width="18" height="12" rx="4" fill="#0B2228" stroke=${c} strokeWidth="1.6"/><circle cx=${sx} cy=${sy} r="1.6" fill=${c}/></g>
+  </svg>`}
+
+function ScoreRing({v,size=118,color}){const r=size/2-9,C=2*Math.PI*r;
+  return html`<div className="ring" style=${{width:size,height:size}}><svg width=${size} height=${size}>
+    <circle cx=${size/2} cy=${size/2} r=${r} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="10"/>
+    <circle cx=${size/2} cy=${size/2} r=${r} fill="none" stroke=${color} strokeWidth="10" strokeLinecap="round" strokeDasharray=${C} strokeDashoffset=${C*(1-v/100)} style=${{transition:'stroke-dashoffset .5s, stroke .5s',filter:`drop-shadow(0 0 6px ${color}66)`}}/></svg>
+    <div className="c"><div><b>${Math.round(v)}</b><div className="tiny">/ 100</div></div></div></div>`}
+
+function LinkChip({onClick}){const l=S.link,on=l.status==='streaming',sim=l.kind==='simulated';
+  const col=l.status==='connecting'?'#FFB547':on?(sim?'#FFB547':'#3CF2B4'):'#FF6B7A',I_=src();
+  return html`<button className="chip" onClick=${onClick} style=${{color:col}} aria-label="Connection status">
+    <span className=${on?'pulseDot':''} style=${{width:8,height:8,borderRadius:4,background:col,display:'inline-block'}}></span>
+    ${l.status==='connecting'?'Connecting…':on?I_.chip:'Disconnected'}
+    ${on&&html`<span style=${{color:'var(--mute)'}}>· ${I_.sub}${sim?` · ${Math.round(S.battery)}%`:''}</span>`}</button>`}
+
+/* ---------------- HOME ---------------- */
+function Home({go,openDemo,openCal}){
+  useTick();const L=S.live,P=POSTURES[L.cls],on=S.link.status==='streaming',ss=S.sess;
+  const haptic=performance.now()-S.fb.hapticAt<2200;
+  const good=ss.time.upright,poor=ss.time.slouch+ss.time.left+ss.time.right+ss.time.bend;
+  const th=SENS[S.settings.sensitivity],sideAct=Math.abs(L.p)>=Math.abs(L.r),pct=Math.min(1,L.bad/S.settings.alertDelay);
+  let msg=P.msg;if(P.kind==='poor'&&L.bad>3)msg=S.fb.fired?`You've been ${P.head.toLowerCase()} for ${Math.round(L.bad)} seconds. Straighten up!`:P.msg;
+  const color=on?P.color:'#5E807D';
+  return html`<div>
+    <div className="hdr"><div className="row"><${Logo} s=${34}/><b style=${{letterSpacing:'.14em',fontSize:15}}>ALIGNA</b></div>
+      <div className="row" style=${{gap:8}}><button className="chip demoPill" onClick=${openDemo}>${S.link.kind==='simulated'?'DEMO':'LIVE'}</button>
+      <button className="iconbtn" onClick=${()=>go('profile')} aria-label="Profile"><${Icon} n="user" s=${19}/></button></div></div>
+    <${LinkChip} onClick=${()=>go('device')}/>
+    <div style=${{margin:'16px 2px 12px'}}>
+      <div className="lbl">${on?`Current posture · held ${fmtT(L.since)}`:'No data stream'}</div>
+      <div className="posLabel" style=${{color}}>${on?P.head:'Device offline'}</div>
+      <div className="sub" style=${{marginTop:4,color:'var(--ink)',opacity:.85}}>${on?msg:'Reconnect the wearable or start the demo source to see live posture.'}</div>
+      ${on&&P.kind==='poor'&&html`<div className="nudge" style=${{color:'#FFD59A'}}><${Icon} n="vib" s=${18}/>
+        <div style=${{flex:1}}>${S.fb.fired?(S.link.kind==='remote'?'Nudge played on the iPhone. Return upright to reset.':S.link.kind==='phone'?'Sound nudge played. Return upright to reset.':'Haptic nudge sent. Return upright to reset.'):`${S.link.kind==='phone'||S.link.kind==='remote'?'Sound':'Haptic'} nudge in ${Math.max(0,Math.ceil(S.settings.alertDelay-L.bad))} s`}
+        <div className="bar" style=${{marginTop:6}}><i style=${{width:pct*100+'%',background:'linear-gradient(90deg,#FFB547,#FF6B7A)'}}></i></div></div></div>`}
+    </div>
+    <div className="card hero">
+      <div className="figs">
+        <div className=${'fig'+(sideAct?' act':'')}><${SideFigure} P=${on?L.p:0} color=${P.color} haptic=${haptic} dim=${!on} uid="h1"/>
+          <div className="figcap"><span>Side · tilt</span><b>${on?fmtA(L.p,0):'–'}</b></div></div>
+        <div className=${'fig'+(!sideAct?' act':'')}><${BackFigure} R=${on?L.r:0} color=${P.color} dim=${!on} uid="h2"/>
+          <div className="figcap"><span>Back · lateral</span><b>${on?fmtA(L.r,0):'–'}</b></div></div>
+      </div>
+      <div className="row tiny" style=${{justifyContent:'center',gap:14,marginTop:4}}>
+        <span className="row" style=${{gap:5}}><i style=${{width:14,borderTop:'2px dashed rgba(233,247,244,.4)'}}></i>Neutral reference</span>
+        <span className="row" style=${{gap:5}}><i style=${{width:14,height:3,borderRadius:2,background:color}}></i>Your spine line</span></div>
+    </div>
+    <div className="card row" style=${{gap:16}}>
+      <${ScoreRing} v=${on?S.score:0} color=${on?(S.score>=70?'#3CF2B4':S.score>=50?'#FFB547':'#FF6B7A'):'#5E807D'}/>
+      <div style=${{flex:1}}>
+        <div className="lbl">Alignment score</div><div style=${{fontWeight:600,fontSize:16,margin:'2px 0 10px'}}>${on?scoreWord(S.score):'Waiting for data'}</div>
+        <div className="row between tiny"><span>Good posture</span><b className="num" style=${{color:'#3CF2B4'}}>${fmtT(good)}</b></div>
+        <div className="row between tiny" style=${{marginTop:4}}><span>Poor posture</span><b className="num" style=${{color:'#FFB547'}}>${fmtT(poor)}</b></div>
+        <div className="row between tiny" style=${{marginTop:4}}><span>Session</span><b className="num" style=${{color:'var(--ink)'}}>${fmtT(ss.elapsed)}</b></div>
+      </div></div>
+    <div className="card">
+      <div className="row between"><span className="h2">Orientation</span><span className="tiny">relative to your calibrated neutral</span></div>
+      ${[['Forward tilt',L.p,th.slouch,-10,60,false],['Lateral tilt',L.r,th.lean,-30,30,true]].map(([n,v,t,mn,mx,c])=>html`<div key=${n} style=${{marginTop:12}}>
+        <div className="row between" style=${{fontSize:13}}><span>${n}</span><b className="num">${on?fmtA(v):'–'}</b></div>
+        <div className="gauge"><span className="z" style=${{left:((c?-t:mn)-mn)/(mx-mn)*100+'%',width:((c?2*t:t-mn))/(mx-mn)*100+'%'}}></span>${c&&html`<span className="mid"></span>`}
+          <span className="k" style=${{left:`calc(${(clamp(on?v:0,mn,mx)-mn)/(mx-mn)*100}% - 2px)`,color:on?P.color:'#5E807D',background:on?P.color:'#5E807D'}}></span></div>
+        <div className="row between tiny"><span>${c?'Left':fmtA(mn,0)}</span><span>${c?`±${t}° comfort zone`:`< ${t}° comfort zone`}</span><span>${c?'Right':fmtA(mx,0)}</span></div></div>`)}
+      <div className="row between" style=${{fontSize:13,marginTop:12}}><span>Body motion (gyro)</span><b className="num">${on?L.gyroMag.toFixed(0):'–'} °/s</b></div>
+    </div>
+    ${!S.calib.done&&html`<button className="card row" style=${{width:'100%',textAlign:'left',borderColor:'rgba(255,181,71,.35)'}} onClick=${openCal}>
+      <div className="iconbtn" style=${{color:'#FFB547'}}><${Icon} n="target" s=${20}/></div>
+      <div style=${{flex:1}}><b style=${{fontSize:14}}>Calibrate your neutral posture</b><div className="tiny">Angles currently include the sensor's mounting offset.</div></div><${Icon} n="chev" s=${18}/></button>`}
+    <div className="card">
+      <div className="row between"><span className="h2">Today's goal</span><span className="tiny">${Math.round(good/60)} / ${S.settings.goalMin} min upright</span></div>
+      <div className="bar" style=${{marginTop:10,height:10}}><i style=${{width:Math.min(100,good/60/S.settings.goalMin*100)+'%',background:'linear-gradient(90deg,#18C3B0,#3CF2B4)'}}></i></div>
+      <div className="tiny" style=${{marginTop:8}}>Counts upright time in this session's ${S.link.kind==='simulated'?'simulated ':''}data.</div></div>
+  </div>`}
+
+/* ---------------- LIVE ---------------- */
+function useCanvas(draw){const ref=useRef(null);useEffect(()=>{let raf;const loop=()=>{const c=ref.current;if(c){const dpr=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);draw(x,w,h)}raf=requestAnimationFrame(loop)};loop();return()=>cancelAnimationFrame(raf)},[draw]);return ref}
+function makeDraw(keys,colors,win,fixed,bands){return(x,w,h)=>{
+  const b=S.buf,n=Math.min(b.n,Math.round(win*50));const padL=34,padB=16,pw=w-padL-4,ph=h-padB-6;
+  const get=(k,i)=>b.ch[k][(b.head-n+i+BUFN)%BUFN];
+  let mn=fixed?fixed[0]:Infinity,mx=fixed?fixed[1]:-Infinity;
+  if(!fixed){for(const k of keys)for(let i=0;i<n;i++){const v=get(k,i);if(v<mn)mn=v;if(v>mx)mx=v}if(!isFinite(mn)){mn=-1;mx=1}const pad=Math.max(.05,(mx-mn)*.15);mn-=pad;mx+=pad}
+  const Y=v=>6+ph-(v-mn)/(mx-mn)*ph;
+  x.font='10px JetBrains Mono, monospace';x.fillStyle='rgba(142,178,175,.8)';x.strokeStyle='rgba(150,235,220,.08)';x.lineWidth=1;
+  for(let j=0;j<=3;j++){const v=mn+(mx-mn)*j/3,y=Y(v);x.beginPath();x.moveTo(padL,y);x.lineTo(w-4,y);x.stroke();x.fillText(Math.abs(v)>=10?v.toFixed(0):v.toFixed(1),2,y+3)}
+  for(let s=0;s<=win;s+=win>6?2:1){const xx=padL+pw*(1-s/win);x.fillText(s?`-${s}s`:'now',xx-(s?12:20),h-3)}
+  if(bands)for(const[v,c]of bands){x.strokeStyle=c;x.setLineDash([4,4]);x.beginPath();x.moveTo(padL,Y(v));x.lineTo(w-4,Y(v));x.stroke();x.setLineDash([])}
+  const off=Math.round(win*50)-n;
+  keys.forEach((k,ki)=>{x.strokeStyle=colors[ki];x.lineWidth=1.6;x.beginPath();for(let i=0;i<n;i++){const xx=padL+pw*(off+i)/(win*50),y=Y(get(k,i));i?x.lineTo(xx,y):x.moveTo(xx,y)}x.stroke()})
+}}
+function Chart({keys,colors,win,fixed,bands,h=130}){const draw=useMemo(()=>makeDraw(keys,colors,win,fixed,bands),[win,JSON.stringify(bands)]);const ref=useCanvas(draw);
+  return html`<div className="chart" style=${{height:h}}><canvas ref=${ref}></canvas></div>`}
+function Live(){
+  useTick();const [win,setWin]=useState(8);const L=S.live,sim=S.link.kind==='simulated',on=S.link.status==='streaming',th=SENS[S.settings.sensitivity],P=POSTURES[L.cls];
+  const AC=['#FF7A90','#3CF2B4','#7CB8FF'];
+  const ch=[['aX',L.ax,'g',AC[0]],['aY',L.ay,'g',AC[1]],['aZ',L.az,'g',AC[2]],['gX',L.gx,'°/s',AC[0]],['gY',L.gy,'°/s',AC[1]],['gZ',L.gz,'°/s',AC[2]]];
+  return html`<div>
+    <div className="hdr"><div><h1 className="h1">Live sensor</h1><div className="sub">${S.link.kind==='phone'||S.link.kind==='remote'?'iPhone · 6-axis motion stream':'MPU6050 · 6-axis IMU stream'}</div></div>
+      <div className="row" style=${{gap:6}}><button className="iconbtn" aria-label=${S.livePaused?'Resume':'Pause'} onClick=${()=>{S.livePaused=!S.livePaused;toast(S.livePaused?'Display paused · data still recorded':'Display resumed','#8EB2AF',S.livePaused?'pause':'play')}}><${Icon} n=${S.livePaused?'play':'pause'} s=${18}/></button>
+      <button className="iconbtn" aria-label="Reset display" onClick=${()=>{S.buf.n=0;S.samples=0;toast('Display buffer cleared','#8EB2AF','reset')}}><${Icon} n="reset" s=${18}/></button></div></div>
+    <div className=${'hatch'+(sim?'':' hw')}><${Icon} n=${src().ico} s=${20}/><div><b>${src().title}</b><br/>${src().body}</div></div>
+    <div className="row between tiny" style=${{margin:'0 2px 10px'}}><span className="mono">${on?(S.livePaused?'⏸ paused':'● streaming'):'○ no stream'} · ${S.rateHz} Hz</span><span className="mono">${S.samples.toLocaleString()} samples</span></div>
+    <div className="card" style=${{borderColor:P.color+'55'}}>
+      <div className="row between"><div><div className="lbl">Classification · ${clf.name}</div><div style=${{fontSize:20,fontWeight:600,color:P.color}}>${P.label}</div></div>
+        <div style=${{textAlign:'right'}}><div className="mono" style=${{fontSize:13}}>tilt ${fmtA(L.p)}</div><div className="mono" style=${{fontSize:13}}>lat ${fmtA(L.r)}</div></div></div>
+      <div className="mono tiny" style=${{marginTop:8,color:'var(--mute)'}}>rule: ${L.rule||'–'}</div></div>
+    <div className="grid3" style=${{marginBottom:12}}>${ch.map(([n,v,u,c])=>html`<div className="chan" key=${n}><div className="n"><i style=${{background:c}}></i>${n} · ${u}</div><div className="v mono">${(v>=0?'+':'')+v.toFixed(u==='g'?3:1)}</div></div>`)}</div>
+    <div className="seg" style=${{marginBottom:12}}>${[4,8,15].map(s=>html`<button key=${s} className=${win===s?'on':''} onClick=${()=>setWin(s)}>${s} s window</button>`)}</div>
+    <div className="card"><div className="row between"><span className="h2">Accelerometer</span><div className="legend">${['X','Y','Z'].map((a,i)=>html`<span key=${a}><i style=${{background:AC[i]}}></i>${a}</span>`)}<span>g</span></div></div>
+      <${Chart} keys=${['ax','ay','az']} colors=${AC} win=${win}/></div>
+    <div className="card"><div className="row between"><span className="h2">Gyroscope</span><div className="legend">${['X','Y','Z'].map((a,i)=>html`<span key=${a}><i style=${{background:AC[i]}}></i>${a}</span>`)}<span>°/s</span></div></div>
+      <${Chart} keys=${['gx','gy','gz']} colors=${AC} win=${win}/></div>
+    <div className="card"><div className="row between"><span className="h2">Estimated angles</span><div className="legend"><span><i style=${{background:'#FFB547'}}></i>tilt</span><span><i style=${{background:'#B69CFF'}}></i>lateral</span><span>°</span></div></div>
+      <${Chart} keys=${['p','r']} colors=${['#FFB547','#B69CFF']} win=${win} fixed=${[-25,65]} bands=${[[th.slouch,'rgba(255,181,71,.5)'],[th.bend,'rgba(255,107,122,.5)'],[th.lean,'rgba(182,156,255,.45)'],[-th.lean,'rgba(182,156,255,.45)']]} h=${150}/>
+      <div className="tiny" style=${{marginTop:6}}>Dashed lines: current ${S.settings.sensitivity} thresholds (slouch ${th.slouch}°, bend ${th.bend}°, lean ±${th.lean}°).</div></div>
+    <div className="card"><div className="h2" style=${{marginBottom:10}}>Processing pipeline</div>
+      <div className="pipe">${[['IMU','50 Hz'],['Calibration',S.calib.done?'offset saved':'not set'],['Filter','complementary α .98'],['Angles','tilt · lateral'],['Classifier','threshold v0'],['Feedback',`${S.settings.alertDelay} s → haptic`]].map(([a,b],i)=>html`<${React.Fragment} key=${a}>${i>0&&html`<div className="ar">›</div>`}<div><b>${a}</b>${b}</div><//>`)}</div>
+      <div className="tiny" style=${{marginTop:10}}>Axis convention assumed: X → wearer's right, Y → up the spine, Z → out of the back. Confirm against the final strap mounting.</div></div>
+  </div>`}
+
+/* ---------------- SESSION ---------------- */
+function Session(){
+  useTick();const ss=S.sess,t=ss.time,poor=t.slouch+t.left+t.right+t.bend,stat=t.upright+poor,gp=stat?t.upright/stat*100:0,avg=ss.scoreT?ss.scoreSum/ss.scoreT:0;
+  const total=Math.max(1,ss.elapsed);const segs=[];for(const s of ss.segs){const l=segs[segs.length-1];if(l&&(s.t1-s.t0)/total<.004){l.t1=s.t1}else segs.push({...s})}
+  const drops=ss.segs.filter(s=>POSTURES[s.c].kind==='poor'&&s.t1-s.t0>3).length;
+  const longestPoor=ss.segs.filter(s=>POSTURES[s.c].kind==='poor').reduce((m,s)=>s.t1-s.t0>m.d?{d:s.t1-s.t0,at:s.t0}:m,{d:0,at:0});
+  const end=()=>{if(ss.elapsed<5){toast('Session too short to save','#FF6B7A','x');return}const rec={id:ss.id,date:ss.startedAt.toISOString(),dur:ss.elapsed,good:gp,avg,slouch:ss.events.slouch+ss.events.bend,alerts:ss.alerts,demo:S.link.kind==='simulated'};
+    S.saved=[rec,...S.saved].slice(0,12);store.set('saved',S.saved);S.sess=newSession();S.sess.running=false;toast('Session saved to history')};
+  const hist=ss.hist.slice(-240);
+  return html`<div>
+    <div className="hdr"><div><h1 className="h1">Session</h1><div className="sub">${ss.running?'Recording':'Paused'} · ${src().data}</div></div>
+      <span className="chip" style=${{color:ss.running?'#3CF2B4':'#8EB2AF'}}><span className=${ss.running?'pulseDot':''} style=${{width:8,height:8,borderRadius:4,background:'currentColor',display:'inline-block'}}></span>${ss.running?'REC':'Idle'}</span></div>
+    <div className="card" style=${{textAlign:'center',padding:'20px 16px'}}>
+      <div className="lbl">Session duration</div><div className="num" style=${{fontSize:46,fontWeight:600,letterSpacing:'-.03em',lineHeight:1.1}}>${fmtT(ss.elapsed)}</div>
+      <div className="row" style=${{justifyContent:'center',marginTop:14,gap:8}}>
+        <button className="btn sm" onClick=${()=>{ss.running=!ss.running;toast(ss.running?'Session resumed':'Session paused','#8EB2AF',ss.running?'play':'pause')}}><${Icon} n=${ss.running?'pause':'play'} s=${16}/>${ss.running?'Pause':'Resume'}</button>
+        <button className="btn sm pri" onClick=${end}><${Icon} n="save" s=${16}/>End & save</button>
+        <button className="btn sm" onClick=${()=>{S.sess=newSession();toast('New session started','#3CF2B4','plus')}}><${Icon} n="plus" s=${16}/>New</button></div></div>
+    <div className="grid3" style=${{marginBottom:12}}>${[['Good',gp.toFixed(0)+'%','#3CF2B4'],['Poor',(stat?100-gp:0).toFixed(0)+'%','#FFB547'],['Avg score',avg.toFixed(0),'var(--ink)'],['Slouch events',ss.events.slouch,'var(--ink)'],['Best streak',fmtT(ss.longestGood),'#3CF2B4'],['Haptic alerts',ss.alerts,'var(--ink)']].map(([l,v,c])=>html`<div className="card stat" key=${l} style=${{padding:12,marginBottom:0,borderRadius:18}}><div className="v" style=${{color:c,fontSize:19}}>${v}</div><div className="l">${l}</div></div>`)}</div>
+    <div className="card"><div className="row between"><span className="h2">Posture timeline</span><span className="tiny">${fmtT(ss.elapsed)}</span></div>
+      <div className="tl" style=${{marginTop:12}}>${segs.map((s,i)=>html`<i key=${i} title=${POSTURES[s.c].label} style=${{width:(s.t1-s.t0)/total*100+'%',background:POSTURES[s.c].color,opacity:POSTURES[s.c].kind==='good'?.75:1}}></i>`)}</div>
+      <div className="row between tiny" style=${{marginTop:4}}><span>0:00</span><span>${fmtT(total/2)}</span><span>${fmtT(total)}</span></div>
+      <svg viewBox="0 0 300 60" preserveAspectRatio="none" style=${{width:'100%',height:60,marginTop:10}}>
+        <line x1="0" x2="300" y1=${60-S.settings.targetScore*.6} y2=${60-S.settings.targetScore*.6} stroke="rgba(233,247,244,.2)" strokeDasharray="3 4" vectorEffect="non-scaling-stroke"/>
+        ${hist.length>1&&html`<polyline fill="none" stroke="#3CF2B4" strokeWidth="1.6" vectorEffect="non-scaling-stroke" points=${hist.map((v,i)=>`${i/(hist.length-1)*300},${60-v*.6}`).join(' ')}/>`}</svg>
+      <div className="tiny">Score over the last ${fmtT(hist.length)} · dashed line = your target ${S.settings.targetScore}</div>
+      <div className="legend" style=${{marginTop:10}}>${PKEYS.map(k=>html`<span key=${k}><i style=${{background:POSTURES[k].color,height:8,width:8}}></i>${POSTURES[k].label}</span>`)}</div>
+      <div style=${{marginTop:12,fontSize:13}}>${drops?html`Posture deteriorated <b>${drops}</b> time${drops>1?'s':''} for more than 3 s. Longest poor stretch: <b>${fmtT(longestPoor.d)}</b> starting at ${fmtT(longestPoor.at)}.`:'No sustained poor posture yet.'}</div></div>
+    <div className="card"><div className="h2">Time in each posture</div>
+      ${PKEYS.map(k=>html`<div className="hrow" key=${k}><span>${POSTURES[k].label}</span><div className="bar"><i style=${{width:(t[k]/total*100)+'%',background:POSTURES[k].color}}></i></div><span className="t">${fmtT(t[k])}</span></div>`)}</div>
+    ${S.saved.length>0&&html`<div className="card"><div className="h2" style=${{marginBottom:6}}>Saved sessions</div>
+      <table><thead><tr><th>Date</th><th className="r">Length</th><th className="r">Good</th><th className="r">Score</th></tr></thead><tbody>
+      ${S.saved.slice(0,5).map(r=>html`<tr key=${r.id}><td>${new Date(r.date).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}${r.demo?html` <span className="tiny" style=${{color:'#FFB547'}}>demo</span>`:''}</td><td className="r">${fmtT(r.dur)}</td><td className="r">${r.good.toFixed(0)}%</td><td className="r">${r.avg.toFixed(0)}</td></tr>`)}</tbody></table></div>`}
+  </div>`}
+
+/* ---------------- TRENDS (sample data) ---------------- */
+function prng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function sample(view){const R=prng(view==='day'?11:view==='week'?22:33);
+  const labels=view==='day'?['8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p','7p']:view==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun']:Array.from({length:30},(_,i)=>String(i+1));
+  const n=labels.length,score=[],good=[],poor=[],slouch=[];
+  for(let i=0;i<n;i++){const trend=view==='month'?i*.45:view==='week'?i*1.3:(i>5&&i<9?-8:0);const s=clamp(64+trend+R()*14-(view==='day'&&i>8?6:0),40,96);score.push(Math.round(s));
+    const tot=view==='day'?50+R()*10:240+R()*140;good.push(Math.round(tot*s/100));poor.push(Math.round(tot*(1-s/100)));slouch.push(Math.round((100-s)/(view==='day'?6:2.2)+R()*3))}
+  const sum=a=>a.reduce((x,y)=>x+y,0),G=sum(good),Pm=sum(poor);
+  const dist={upright:G,slouch:Pm*.52,left:Pm*.17,right:Pm*.21,bend:Pm*.10,moving:(G+Pm)*.12};
+  return{labels,score,good,poor,slouch,dist,left:Math.round(sum(slouch)*.33),right:Math.round(sum(slouch)*.41),avg:Math.round(sum(score)/n),prevAvg:Math.round(sum(score)/n-(view==='month'?5:view==='week'?3:-2)),G,Pm}}
+function useWidth(){const ref=useRef(null);const[w,setW]=useState(320);useEffect(()=>{const el=ref.current;if(!el)return;const ro=new ResizeObserver(()=>setW(el.clientWidth));ro.observe(el);setW(el.clientWidth);return()=>ro.disconnect()},[]);return[ref,w]}
+function LineChart({labels,values,target}){const[ref,W]=useWidth();const[sel,setSel]=useState(values.length-1);const H=150,pl=28,pr=8,pt=12,pb=20,mn=40,mx=100;
+  const X=i=>pl+(W-pl-pr)*i/Math.max(1,values.length-1),Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));const s=Math.min(sel,values.length-1);
+  const pts=values.map((v,i)=>[X(i),Y(v)]),line=spath(pts),area=line+`L${X(values.length-1)} ${H-pb}L${X(0)} ${H-pb}Z`;const step=Math.ceil(labels.length/7);
+  return html`<div ref=${ref} style=${{position:'relative'}}><svg width=${W} height=${H} style=${{display:'block',touchAction:'pan-y'}} onPointerMove=${e=>{const r=e.currentTarget.getBoundingClientRect();setSel(clamp(Math.round((e.clientX-r.left-pl)/(W-pl-pr)*(values.length-1)),0,values.length-1))}} onPointerDown=${e=>{const r=e.currentTarget.getBoundingClientRect();setSel(clamp(Math.round((e.clientX-r.left-pl)/(W-pl-pr)*(values.length-1)),0,values.length-1))}}>
+    <defs><linearGradient id="la" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3CF2B4" stopOpacity=".35"/><stop offset="1" stopColor="#3CF2B4" stopOpacity="0"/></linearGradient></defs>
+    ${[50,70,90].map(v=>html`<g key=${v}><line x1=${pl} x2=${W-pr} y1=${Y(v)} y2=${Y(v)} stroke="rgba(150,235,220,.08)"/><text x="2" y=${Y(v)+3} fontSize="10" fill="#5E807D">${v}</text></g>`)}
+    <line x1=${pl} x2=${W-pr} y1=${Y(target)} y2=${Y(target)} stroke="rgba(233,247,244,.35)" strokeDasharray="4 4"/>
+    <path d=${area} fill="url(#la)"/><path d=${line} fill="none" stroke="#3CF2B4" strokeWidth="2.2"/>
+    ${labels.map((l,i)=>i%step===0||i===labels.length-1?html`<text key=${i} x=${X(i)} y=${H-4} fontSize="10" fill="#5E807D" textAnchor="middle">${l}</text>`:null)}
+    <line x1=${X(s)} x2=${X(s)} y1=${pt} y2=${H-pb} stroke="rgba(233,247,244,.25)"/><circle cx=${X(s)} cy=${Y(values[s])} r="5" fill="#071A1F" stroke="#3CF2B4" strokeWidth="2.2"/></svg>
+    <div className="chip" style=${{position:'absolute',top:-4,left:clamp(X(s)-40,0,W-96),height:24,fontSize:11.5,background:'#11313A'}}>${labels[s]} · <b>${values[s]}</b></div></div>`}
+function Donut({parts}){const tot=parts.reduce((a,p)=>a+p.v,0)||1,r=46,C=2*Math.PI*r;let acc=0;
+  return html`<svg width="120" height="120" viewBox="0 0 120 120" style=${{flex:'none'}}><g transform="rotate(-90 60 60)">${parts.map(p=>{const len=p.v/tot*C,el=html`<circle key=${p.k} cx="60" cy="60" r=${r} fill="none" stroke=${p.c} strokeWidth="16" strokeDasharray=${`${Math.max(0,len-2)} ${C}`} strokeDashoffset=${-acc}/>`;acc+=len;return el})}</g>
+    <text x="60" y="58" textAnchor="middle" fontSize="20" fontWeight="600" fill="#E9F7F4">${Math.round(parts[0].v/tot*100)}%</text><text x="60" y="74" textAnchor="middle" fontSize="10" fill="#8EB2AF">upright</text></svg>`}
+function Trends(){
+  useTick();const[view,setView]=useState('week');const d=useMemo(()=>sample(view),[view]);const[sel,setSel]=useState(null);
+  const delta=d.avg-d.prevAvg,mxB=Math.max(...d.good.map((g,i)=>g+d.poor[i])),mxS=Math.max(...d.slouch);
+  const parts=PKEYS.map(k=>({k,v:d.dist[k],c:POSTURES[k].color,l:POSTURES[k].label}));const si=sel===null?d.labels.length-1:Math.min(sel,d.labels.length-1);
+  const unit=view==='day'?'min':'min';
+  const sessions=[{n:'Morning desk work',dur:5400,good:78,avg:81,sl:6},{n:'Lecture',dur:3600,good:64,avg:70,sl:11},{n:'Lab session',dur:7200,good:59,avg:66,sl:15},{n:'Evening study',dur:4500,good:71,avg:74,sl:8},{n:'Commute',dur:2400,good:55,avg:62,sl:9}];
+  return html`<div>
+    <div className="hdr"><div><h1 className="h1">Trends</h1><div className="sub">Posture over time</div></div></div>
+    <div className="seg" style=${{marginBottom:10}}>${['day','week','month'].map(v=>html`<button key=${v} className=${view===v?'on':''} onClick=${()=>{setView(v);setSel(null)}}>${v[0].toUpperCase()+v.slice(1)}</button>`)}</div>
+    <div className="hatch" style=${{padding:'7px 12px'}}><${Icon} n="flask" s=${16}/><span>Sample data for illustration. Real history appears once hardware sessions are recorded.</span></div>
+    <div className="card">
+      <div className="row between" style=${{alignItems:'flex-end'}}><div><div className="lbl">Average ${view==='day'?'today':view==='week'?'this week':'this month'}</div><div className="num" style=${{fontSize:40,fontWeight:600,lineHeight:1}}>${d.avg}</div></div>
+        <span className="chip" style=${{color:delta>=0?'#3CF2B4':'#FF6B7A'}}>${delta>=0?'▲':'▼'} ${Math.abs(delta)} vs previous ${view}</span></div>
+      <div style=${{marginTop:14}}><${LineChart} key=${view} labels=${d.labels} values=${d.score} target=${S.settings.targetScore}/></div>
+      <div className="tiny">Drag across the chart to inspect · dashed line = target ${S.settings.targetScore}</div></div>
+    <div className="card"><div className="row between"><span className="h2">Good vs poor posture</span><div className="legend"><span><i style=${{background:'#3CF2B4'}}></i>good</span><span><i style=${{background:'#FFB547'}}></i>poor</span></div></div>
+      <div className="tiny" style=${{margin:'4px 0 10px'}}>${d.labels[si]}: <b style=${{color:'#3CF2B4'}}>${d.good[si]} ${unit}</b> good · <b style=${{color:'#FFB547'}}>${d.poor[si]} ${unit}</b> poor</div>
+      <div className="bars" style=${{gap:view==='month'?2:5}}>${d.good.map((g,i)=>html`<div key=${i} className=${'col'+(i===si?' sel':'')} onClick=${()=>setSel(i)} style=${{height:(g+d.poor[i])/mxB*100+'%',alignSelf:'flex-end'}}>
+        <span style=${{flex:g,background:'linear-gradient(180deg,#3CF2B4,#18C3B0)'}}></span><span style=${{flex:d.poor[i],background:'#FFB547'}}></span></div>`)}</div>
+      <div className="xl" style=${{gap:view==='month'?2:5}}>${d.labels.map((l,i)=>html`<span key=${i}>${view==='month'&&i%5?'':l}</span>`)}</div></div>
+    <div className="card"><div className="h2" style=${{marginBottom:10}}>Posture distribution</div>
+      <div className="row" style=${{gap:16}}><${Donut} parts=${parts}/><div style=${{flex:1}}>${parts.map(p=>html`<div key=${p.k} className="row between" style=${{fontSize:12.5,padding:'3px 0'}}><span className="row" style=${{gap:7}}><i style=${{width:9,height:9,borderRadius:3,background:p.c,display:'inline-block'}}></i>${p.l}</span><b className="num">${Math.round(p.v/parts.reduce((a,x)=>a+x.v,0)*100)}%</b></div>`)}</div></div></div>
+    <div className="card"><div className="row between"><span className="h2">Slouch frequency</span><span className="tiny">events per ${view==='day'?'hour':'day'}</span></div>
+      <div className="bars" style=${{height:80,marginTop:10,gap:view==='month'?2:5}}>${d.slouch.map((v,i)=>html`<div key=${i} className="col" style=${{height:v/mxS*100+'%',alignSelf:'flex-end',background:'#FFB547',opacity:.4+.6*v/mxS}}></div>`)}</div>
+      <div className="xl" style=${{gap:view==='month'?2:5}}>${d.labels.map((l,i)=>html`<span key=${i}>${view==='month'&&i%5?'':l}</span>`)}</div>
+      <div className="h2" style=${{margin:'16px 0 8px'}}>Left vs right leaning</div>
+      <div className="row" style=${{gap:0,height:30,borderRadius:10,overflow:'hidden'}}><div style=${{flex:d.left,background:'#B69CFF',height:'100%',display:'grid',placeItems:'center',fontSize:12,fontWeight:600,color:'#1a1033'}}>L ${d.left}</div><div style=${{flex:d.right,background:'#FF8A5B',height:'100%',display:'grid',placeItems:'center',fontSize:12,fontWeight:600,color:'#2a1208'}}>R ${d.right}</div></div>
+      <div className="tiny" style=${{marginTop:6}}>${d.right>d.left?`Right-side leaning is ${Math.round((d.right/d.left-1)*100)}% more frequent. Check desk and screen position.`:'Left and right leaning are balanced.'}</div></div>
+    <div className="card"><div className="h2" style=${{marginBottom:6}}>Session comparison</div>
+      <table><thead><tr><th>Session</th><th className="r">Length</th><th className="r">Good</th><th className="r">Score</th><th className="r">Slouch</th></tr></thead><tbody>
+      ${sessions.map(s=>html`<tr key=${s.n}><td>${s.n}</td><td className="r">${fmtT(s.dur)}</td><td className="r">${s.good}%</td><td className="r" style=${{color:s.avg>=75?'#3CF2B4':s.avg>=65?'var(--ink)':'#FFB547'}}>${s.avg}</td><td className="r">${s.sl}</td></tr>`)}</tbody></table>
+      <div className="tiny" style=${{marginTop:8}}>Sample sessions. Your saved demo sessions are on the Session tab.</div></div>
+  </div>`}
+
+/* ---------------- DEVICE ---------------- */
+function Puck({buzz,color}){return html`<svg width="132" height="132" viewBox="0 0 132 132" className=${buzz?'buzz':''}>
+  <defs><radialGradient id="pg" cx=".35" cy=".3"><stop offset="0" stopColor="#2F6670"/><stop offset="1" stopColor="#0E2A31"/></radialGradient></defs>
+  <circle cx="66" cy="66" r="60" fill="none" stroke=${color} strokeOpacity=".15" strokeWidth="1"/><circle cx="66" cy="66" r="48" fill="none" stroke=${color} strokeOpacity=".25" strokeDasharray="2 5"/>
+  ${buzz&&html`<circle cx="66" cy="66" r="36" fill="none" stroke="#FFB547" strokeWidth="2"><animate attributeName="r" from="36" to="62" dur=".6s" repeatCount="3"/><animate attributeName="opacity" from="1" to="0" dur=".6s" repeatCount="3"/></circle>`}
+  <rect x="38" y="30" width="56" height="72" rx="24" fill="url(#pg)" stroke="rgba(150,235,220,.3)"/>
+  <rect x="58" y="44" width="16" height="4" rx="2" fill=${color}/><circle cx="66" cy="70" r="9" fill="none" stroke="rgba(233,247,244,.35)" strokeWidth="1.5"/><path d="M62 70l3 3 5-6" fill="none" stroke=${color} strokeWidth="1.8" strokeLinecap="round"/></svg>`}
+function PhoneCard({set}){const st=S.settings,ph=S.link.kind==='phone',on=ph&&S.link.status==='streaming';const[err,setErr]=useState(null);
+  const start=()=>{setErr(null);connect('phone').then(()=>{if(S.link.err){setErr(S.link.err);connect('simulated')}})};
+  const T=(k,label)=>html`<div className="setrow row between"><span style=${{fontSize:13.5}}>${label}</span><button className=${'tog'+(st[k]?' on':'')} role="switch" aria-checked=${st[k]} aria-label=${label} onClick=${()=>{set(k,!st[k]);if(source&&source.inv)source.inv=S.settings}}></button></div>`;
+  return html`<div className="card" style=${{borderColor:on?'rgba(60,242,180,.45)':undefined}}>
+    <div className="row between"><div><div className="h2">iPhone sensors</div><div className="tiny">Real accelerometer + gyroscope data from this phone</div></div>
+      <span className="chip" style=${{color:on?'#3CF2B4':'#8EB2AF'}}>${on?'Live':'Off'}</span></div>
+    <div className="setrow"><div style=${{fontSize:13.5,marginBottom:8}}>How is the phone placed?</div>
+      <div className="seg">${[['back','On upper back'],['hand','Held in hand']].map(([k,n])=>html`<button key=${k} className=${st.phoneMount===k?'on':''} onClick=${()=>set('phoneMount',k)}>${n}</button>`)}</div>
+      <div className="tiny" style=${{marginTop:8}}>${st.phoneMount==='back'?'Portrait, top of the phone toward your head, screen facing outward, centred between the shoulder blades in a snug strap or pouch.':'Hold it upright, screen facing you. Tilt the top away from you to act as a forward slouch, and sideways to act as a lean.'}</div></div>
+    ${T('invFwd','Reverse forward / back')}${T('invLat','Reverse left / right')}${T('sound','Chime on posture nudge')}${T('voice','Spoken "Straighten up"')}
+    ${on?html`<button className="btn full warn" style=${{marginTop:10}} onClick=${()=>connect('simulated')}><${Icon} n="x" s=${16}/>Stop · back to demo source</button>`
+      :html`<button className="btn full pri" style=${{marginTop:10}} disabled=${S.link.status==='connecting'} onClick=${start}><${Icon} n="dev" s=${18}/>Use iPhone sensors</button>`}
+    ${err&&html`<div className="hatch" style=${{marginTop:12,marginBottom:0}}><${Icon} n="x" s=${18}/><span>${err}</span></div>`}
+    <div className="tiny" style=${{marginTop:10}}>iPhone web pages cannot vibrate, so nudges play a sound instead. Turn off Silent Mode and raise the volume.</div></div>`}
+function LinkCard(){
+  const[mode,setMode]=useState(()=>S.link.kind==='phone'?'send':'recv');const[code,setCode]=useState('');const[err,setErr]=useState(null);
+  const phOn=S.link.kind==='phone'&&S.link.status==='streaming',rem=S.link.kind==='remote',remOn=rem&&S.link.status==='streaming',busy=S.link.status==='connecting';
+  const join=()=>{setErr(null);connect('remote',code).then(()=>{if(S.link.err){setErr(S.link.err);connect('simulated')}})};
+  const st=Share.status;
+  return html`<div className="card" style=${{borderColor:(st==='live'||remOn)?'rgba(60,242,180,.45)':undefined}}>
+    <div className="row between"><div><div className="h2">Live link</div><div className="tiny">iPhone on your back → live view on iPad</div></div>
+      <span className="chip" style=${{color:(st==='live'||remOn)?'#3CF2B4':'#8EB2AF'}}>${st==='live'?`Sharing · ${Share.conns.length} display`:remOn?'Receiving':'Off'}</span></div>
+    <div className="seg" style=${{margin:'12px 0'}}>${[['send','This is the sensor'],['recv','This is the display']].map(([k,n])=>html`<button key=${k} className=${mode===k?'on':''} onClick=${()=>{setMode(k);setErr(null)}}>${n}</button>`)}</div>
+    ${mode==='send'?html`<div>
+      ${!phOn&&st==='off'&&html`<div className="tiny" style=${{marginBottom:10}}>Step 1: start <b>iPhone sensors</b> below. Step 2: come back here and tap Start sharing.</div>`}
+      ${st!=='off'&&st!=='error'&&html`<div style=${{textAlign:'center',padding:'6px 0 12px'}}>
+        <div className="lbl">${st==='starting'?'Getting a code…':'Enter this code on the iPad'}</div>
+        <div className="mono" style=${{fontSize:46,letterSpacing:'.3em',fontWeight:500,color:'#3CF2B4',paddingLeft:'.3em'}}>${Share.code||'····'}</div>
+        <div className="tiny">${st==='live'?`Streaming ${S.rateHz} Hz · nudges will play on this iPhone`:st==='waiting'?'Waiting for the display to connect…':'Contacting pairing server…'}</div></div>`}
+      ${Share.err&&html`<div className="hatch" style=${{marginBottom:10}}><${Icon} n="x" s=${18}/><span>${Share.err}</span></div>`}
+      ${st==='off'||st==='error'?html`<button className="btn pri full" disabled=${!phOn} onClick=${()=>Share.start()}><${Icon} n="wifi" s=${18}/>Start sharing</button>`
+        :html`<button className="btn warn full" onClick=${()=>{Share.stop();toast('Sharing stopped','#8EB2AF','x')}}><${Icon} n="x" s=${16}/>Stop sharing</button>`}</div>`
+    :html`<div>
+      ${remOn?html`<div className="row between" style=${{marginBottom:10}}><span>Linked to <b className="mono" style=${{color:'#3CF2B4'}}>${S.link.label.slice(-4)}</b></span><span className="tiny mono">${S.rateHz} Hz</span></div>
+        <button className="btn warn full" onClick=${()=>connect('simulated')}><${Icon} n="x" s=${16}/>Disconnect · back to demo source</button>`
+      :html`<div className="row" style=${{gap:8}}><input type="text" aria-label="Pairing code" placeholder="Code" maxLength="4" autoCapitalize="characters" autoComplete="off" spellCheck="false" value=${code}
+          onInput=${e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g,'').slice(0,4))} onKeyDown=${e=>{if(e.key==='Enter'&&code.length===4)join()}} className="mono" style=${{letterSpacing:'.3em',fontSize:20,textAlign:'center',flex:1}}/>
+        <button className="btn pri" disabled=${code.length!==4||busy} onClick=${join}>${busy&&rem?'Linking…':'Connect'}</button></div>
+        <div className="tiny" style=${{marginTop:8}}>Calibrate from this screen once linked. Nudges play on the iPhone so the wearer hears them.</div>`}
+      ${(err||(rem&&S.link.err))&&html`<div className="hatch" style=${{marginTop:10,marginBottom:0}}><${Icon} n="x" s=${18}/><span>${err||S.link.err}</span></div>`}</div>`}
+  </div>`}
+function Device({openCal}){
+  useTick();const l=S.link,on=l.status==='streaming',sim=l.kind==='simulated',st=S.settings;const[buzz,setBuzz]=useState(false);const[note,setNote]=useState(null);
+  const test=()=>{setBuzz(true);setTimeout(()=>setBuzz(false),1900);fireHaptic('test pattern',true)};
+  const set=(k,v)=>{st[k]=v;saveSettings()};
+  const ph=l.kind==='phone',I_=src();
+  const rows=[['Data source',sim?'Simulated IMU (demo)':ph?'iPhone motion sensors':l.kind==='remote'?l.label:'ESP32 · BLE'],['Link',l.status==='streaming'?'Streaming':l.status==='connecting'?'Connecting…':'Not connected'],['Transport',I_.transport],
+    ['IMU sensor',on?I_.imu:'No data'],['Sample rate',on?`${S.rateHz} Hz`:'–'],['Battery',sim?`${Math.round(S.battery)}% · simulated`:ph||l.kind==='remote'?'Not exposed to web pages':'Not reported yet'],
+    ['Device ID',sim?'ALIGNA-SIM-01 (virtual)':ph?'This iPhone':l.kind==='remote'?'Paired iPhone':'—'],['Firmware',sim||ph||l.kind==='remote'?'n/a':'Not reported yet']];
+  return html`<div>
+    <div className="hdr"><div><h1 className="h1">Device</h1><div className="sub">PostureSense wearable</div></div></div>
+    <div className="card" style=${{textAlign:'center',paddingTop:20}}>
+      <div style=${{display:'grid',placeItems:'center'}}><${Puck} buzz=${buzz} color=${on?(sim?'#FFB547':'#3CF2B4'):'#FF6B7A'}/></div>
+      <div style=${{fontWeight:600,fontSize:18,marginTop:6}}>${sim?'Virtual PostureSense':'PostureSense prototype'}</div>
+      <div className="sub">ESP32-WROOM-32 · MPU6050 · 3.7 V Li-Po · ERM motor</div>
+      <div className="row" style=${{justifyContent:'center',marginTop:14,gap:8,flexWrap:'wrap'}}>
+        ${on?html`<button className="btn sm warn" onClick=${disconnect}><${Icon} n="x" s=${16}/>Disconnect</button>`:html`<button className="btn sm pri" disabled=${l.status==='connecting'} onClick=${()=>connect('simulated')}><${Icon} n="reset" s=${16}/>${l.status==='connecting'?'Connecting…':'Start demo source'}</button>`}
+        <button className="btn sm" onClick=${async()=>{await connect('ble');if(S.link.err){setNote(S.link.err);connect('simulated')}}}><${Icon} n="bt" s=${16}/>Connect ESP32</button></div>
+      ${note&&html`<div className="hatch" style=${{marginTop:12,textAlign:'left',marginBottom:0}}><${Icon} n="bt" s=${18}/><span>${note} The demo source was restarted.</span></div>`}</div>
+    <${LinkCard}/>
+    <${PhoneCard} set=${set}/>
+    <div className="card list">${rows.map(([k,v])=>html`<div key=${k}><span className="k">${k}</span><span className="val">${v}</span></div>`)}</div>
+    <div className="card"><div className="row between"><div><div className="h2">Calibration</div><div className="tiny">${S.calib.done?`Neutral saved ${new Date(S.calib.at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}`:'No neutral reference saved yet'}</div></div>
+      <span className="chip" style=${{color:S.calib.done?'#3CF2B4':'#FFB547'}}>${S.calib.done?'Calibrated':'Required'}</span></div>
+      ${S.calib.done&&html`<div className="grid2" style=${{marginTop:12}}><div className="chan"><div className="n">Mounting offset · tilt</div><div className="v mono">${fmtA(S.calib.p)}</div></div><div className="chan"><div className="n">Mounting offset · lateral</div><div className="v mono">${fmtA(S.calib.r)}</div></div></div>`}
+      <button className="btn pri full" style=${{marginTop:14}} onClick=${openCal}><${Icon} n="target" s=${18}/>${S.calib.done?'Recalibrate':'Start calibration'}</button></div>
+    <div className="card"><div className="row between"><div className="h2">Vibration feedback</div><button className=${'tog'+(st.vibOn?' on':'')} role="switch" aria-checked=${st.vibOn} aria-label="Vibration on" onClick=${()=>set('vibOn',!st.vibOn)}></button></div>
+      <div className="setrow"><div className="row between" style=${{fontSize:13}}><span>Intensity</span><b className="num">${st.vibIntensity}%</b></div><input type="range" min="10" max="100" step="5" value=${st.vibIntensity} onInput=${e=>set('vibIntensity',+e.target.value)}/>
+        <div className="tiny">Maps to PWM duty on the motor driver (2N2222) once firmware supports it.</div></div>
+      <div className="setrow"><div style=${{fontSize:13,marginBottom:8}}>Pattern</div><div className="seg">${[['pulse','Pulse'],['double','Double'],['long','Long']].map(([k,n])=>html`<button key=${k} className=${st.vibPattern===k?'on':''} onClick=${()=>set('vibPattern',k)}>${n}</button>`)}</div></div>
+      <div className="setrow"><div className="row between" style=${{fontSize:13}}><span>Alert after poor posture for</span><b className="num">${st.alertDelay} s</b></div><input type="range" min="5" max="60" step="5" value=${st.alertDelay} onInput=${e=>set('alertDelay',+e.target.value)}/></div>
+      <button className="btn full" onClick=${test}><${Icon} n="vib" s=${18}/>Test vibration${sim?' (simulated)':''}</button></div>
+    <div className="card"><details><summary>Hardware integration notes <${Icon} n="chev" s=${16}/></summary>
+      <p>The app reads sensor data through a <code>source</code> interface. Today the <code>SimulatedImuSource</code> is active; <code>Esp32BleSource</code> and <code>Esp32WifiSource</code> are prepared but no protocol is finalised.</p>
+      <p><b style=${{color:'var(--ink)'}}>Proposed BLE packet</b> (for team agreement): one notification of 12 bytes, six little-endian int16 raw counts. At MPU6050 defaults, divide accel by 16384 (±2 g) and gyro by 131 (±250 °/s).</p>
+      <pre>ax ay az gx gy gz   int16 LE × 6
+BLE_CONFIG.serviceUuid = "…"  // set from firmware
+BLE_CONFIG.charUuid    = "…"</pre>
+      <p><b style=${{color:'var(--ink)'}}>Where it can run:</b> Web Bluetooth works in Chrome on Android, Windows, macOS and ChromeOS over HTTPS. It is not available in iOS Safari, and this preview frame blocks device access and outside connections, so the hardware button reports why it cannot connect rather than pretending to.</p>
+      <p><b style=${{color:'var(--ink)'}}>Paths:</b> (1) host this page on HTTPS and open it in Chrome; (2) Wi-Fi: ESP32 runs a WebSocket server sending JSON <code>{"{"}ax,ay,az,gx,gy,gz{"}"}</code>; (3) for a shipped app, port the UI to React Native with a BLE library. Classification can also run on the ESP32 and send only the posture class.</p></details></div>
+  </div>`}
+
+/* ---------------- CALIBRATION FLOW ---------------- */
+function Calibration({close}){
+  useTick();const[step,setStep]=useState(0);const[left,setLeft]=useState(5);const[res,setRes]=useState(null);const timer=useRef(null);
+  const on=S.link.status==='streaming';
+  const[prep,setPrep]=useState(0);const sayP=t=>{if(S.link.kind==='phone')speak(t);else if(S.link.kind==='remote'&&source&&source.send)source.send({k:'say',text:t})};
+  const begin=()=>{if(!on){toast('Connect a data source first','#FF6B7A','x');return}
+    if(S.link.kind==='phone'&&S.settings.phoneMount==='back'){setStep(3);setPrep(10);speak('Put the phone on your back and sit tall.');const t0=performance.now();
+      timer.current=setInterval(()=>{const r=10-(performance.now()-t0)/1000;setPrep(Math.max(0,r));if(r<=0){clearInterval(timer.current);setPrep(0);speak('Hold still.');capture()}},100);return}
+    sayP('Sit tall and hold still.');capture()};
+  const capture=()=>{
+    if(S.link.kind==='simulated'){S._prevMode=sim.mode;sim.setMode('upright')}
+    S.calibCollect=[];setStep(3);setLeft(5);const t0=performance.now();
+    timer.current=setInterval(()=>{const e=(performance.now()-t0)/1000;setLeft(Math.max(0,5-e));if(e>=5){clearInterval(timer.current);finish()}},50)};
+  const finish=()=>{const c=S.calibCollect||[];S.calibCollect=null;if(S.link.kind==='simulated')sim.setMode(S._prevMode||'auto');
+    const tail=c.slice(Math.floor(c.length*.3));if(tail.length<20){setRes({ok:false,why:'Not enough samples received.'});sayP('Calibration failed.');setStep(4);return}
+    const m=k=>tail.reduce((a,x)=>a+x[k],0)/tail.length,sd=k=>{const mu=m(k);return Math.sqrt(tail.reduce((a,x)=>a+(x[k]-mu)**2,0)/tail.length)};
+    const p=m('p'),r=m('r'),sp=sd('p'),sr=sd('r'),g=m('g');
+    if(sp>1.5||sr>1.5||g>15){sayP('Too much movement. Try again.');setRes({ok:false,why:`Too much movement (σ ${Math.max(sp,sr).toFixed(1)}°). Hold still and try again.`});setStep(4);return}
+    S.calib={done:true,p,r,at:Date.now()};store.set('calib',S.calib);setRes({ok:true,p,r,sp:Math.max(sp,sr),n:tail.length});setStep(4);toast('Neutral posture saved');sayP('Calibration saved.')};
+  useEffect(()=>()=>{clearInterval(timer.current);if(S.calibCollect){S.calibCollect=null;if(S.link.kind==='simulated')sim.setMode(S._prevMode||'auto')}},[]);
+  const L=S.live,C=2*Math.PI*70;
+  const steps=[['Wear the device','Strap the sensor on your upper back, centred on the spine, with the switch facing out and the strap snug.'],
+    ['Sit or stand tall','Settle into a comfortable upright position: shoulders relaxed, eyes level, feet flat.'],
+    ['Ready to calibrate','Press Calibrate and hold still for 5 seconds. ALIGNA records this as your neutral orientation.']];
+  return html`<div className="overlay"><div className="screen" style=${{paddingBottom:30}}>
+    <div className="hdr"><button className="iconbtn" onClick=${close} aria-label="Close"><${Icon} n="x" s=${18}/></button><b>Calibration</b><span style=${{width:42}}></span></div>
+    <div className="steps">${[0,1,2,3,4].map(i=>html`<i key=${i} className=${i<=step?'on':''}></i>`)}</div>
+    ${step<3&&html`<div className="enter" key=${step}>
+      <div className="card" style=${{display:'grid',placeItems:'center',padding:'10px 0'}}><div style=${{width:220}}>${step===0?html`<${SideFigure} P=${0} color="#3CF2B4" haptic=${true} uid="c0"/>`:html`<${SideFigure} P=${on?L.p:0} color=${Math.abs(L.p)<6?'#3CF2B4':'#FFB547'} uid="c1"/>`}</div></div>
+      <div className="lbl">Step ${step+1} of 5</div><h2 className="h1" style=${{margin:'4px 0 8px'}}>${steps[step][0]}</h2><p className="sub" style=${{fontSize:15,color:'var(--ink)',opacity:.85}}>${steps[step][1]}</p>
+      ${step>0&&html`<div className="grid2" style=${{margin:'14px 0'}}><div className="chan"><div className="n">Raw tilt (uncorrected)</div><div className="v mono">${fmtA(L.pAbs)}</div></div><div className="chan"><div className="n">Raw lateral</div><div className="v mono">${fmtA(L.rAbs)}</div></div></div>`}
+      ${S.link.kind==='simulated'&&step===2&&html`<div className="tiny" style=${{marginBottom:12,color:'#FFB547'}}>Demo: the simulated wearer will sit upright during capture.</div>`}
+      <button className="btn pri full" style=${{marginTop:8}} onClick=${()=>step<2?setStep(step+1):begin()}>${step<2?'Continue':'Calibrate'}</button></div>`}
+    ${step===3&&html`<div className="enter" style=${{textAlign:'center'}}>
+      <div style=${{display:'grid',placeItems:'center',margin:'20px 0'}}><div style=${{position:'relative',width:170,height:170}}>
+        <svg width="170" height="170" style=${{transform:'rotate(-90deg)'}}><circle cx="85" cy="85" r="70" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="10"/>
+        <circle cx="85" cy="85" r="70" fill="none" stroke="#3CF2B4" strokeWidth="10" strokeLinecap="round" strokeDasharray=${C} strokeDashoffset=${C*left/5} style=${{filter:'drop-shadow(0 0 8px #3CF2B488)'}}/></svg>
+        <div style=${{position:'absolute',inset:0,display:'grid',placeItems:'center'}}><div><div className="num" style=${{fontSize:48,fontWeight:600}}>${Math.ceil(prep>0?prep:left)}</div><div className="tiny">${prep>0?'get ready':'hold still'}</div></div></div></div></div>
+      <h2 className="h1">${prep>0?`Get into position · ${Math.ceil(prep)} s`:'Capturing neutral…'}</h2><p className="sub">Step 4 of 5 · ${(S.calibCollect||[]).length} samples</p>
+      <div className="card" style=${{textAlign:'left'}}><div className="row between" style=${{fontSize:13}}><span>Stability</span><b>${L.gyroMag<8?'Steady':'Moving'}</b></div><div className="bar" style=${{marginTop:8}}><i style=${{width:clamp(100-L.gyroMag*4,5,100)+'%',background:L.gyroMag<8?'#3CF2B4':'#FFB547'}}></i></div></div></div>`}
+    ${step===4&&res&&html`<div className="enter" style=${{textAlign:'center'}}>
+      <div style=${{width:88,height:88,borderRadius:44,margin:'24px auto 14px',display:'grid',placeItems:'center',background:res.ok?'rgba(60,242,180,.14)':'rgba(255,107,122,.14)',color:res.ok?'#3CF2B4':'#FF6B7A'}}><${Icon} n=${res.ok?'check':'x'} s=${40} w=${2.2}/></div>
+      <div className="lbl">Step 5 of 5</div><h2 className="h1">${res.ok?'Neutral saved':'Calibration failed'}</h2>
+      <p className="sub" style=${{fontSize:15}}>${res.ok?'Angles are now measured relative to this position.':res.why}</p>
+      ${res.ok&&html`<div className="card list" style=${{textAlign:'left'}}><div><span className="k">Tilt offset</span><span className="val mono">${fmtA(res.p)}</span></div><div><span className="k">Lateral offset</span><span className="val mono">${fmtA(res.r)}</span></div><div><span className="k">Stability (σ)</span><span className="val mono">${res.sp.toFixed(2)}°</span></div><div><span className="k">Samples used</span><span className="val mono">${res.n}</span></div></div>`}
+      <div className="row" style=${{gap:8,marginTop:10}}><button className="btn" style=${{flex:1}} onClick=${()=>{setStep(2);setRes(null)}}>Redo</button><button className="btn pri" style=${{flex:1}} onClick=${close}>Done</button></div></div>`}
+  </div></div>`}
+
+/* ---------------- PROFILE ---------------- */
+function Profile({back,replay}){
+  useTick();const st=S.settings;const set=(k,v)=>{st[k]=v;saveSettings()};
+  const Tog=({k,label,sub})=>html`<div className="setrow row between"><div><div style=${{fontSize:14}}>${label}</div>${sub&&html`<div className="tiny">${sub}</div>`}</div><button className=${'tog'+(st[k]?' on':'')} role="switch" aria-checked=${st[k]} aria-label=${label} onClick=${()=>set(k,!st[k])}></button></div>`;
+  const Sl=({k,label,min,max,step,u})=>html`<div className="setrow"><div className="row between" style=${{fontSize:14}}><span>${label}</span><b className="num">${st[k]}${u}</b></div><input type="range" min=${min} max=${max} step=${step} value=${st[k]} onInput=${e=>set(k,+e.target.value)}/></div>`;
+  return html`<div>
+    <div className="hdr"><button className="iconbtn" onClick=${back} aria-label="Back"><${Icon} n="back" s=${18}/></button><b>Profile & settings</b><span style=${{width:42}}></span></div>
+    <div className="card row" style=${{gap:14}}><div style=${{width:58,height:58,borderRadius:20,background:'linear-gradient(135deg,#3CF2B4,#139E92)',display:'grid',placeItems:'center',color:'#03221C',fontWeight:700,fontSize:22,flex:'none'}}>${(st.name||'?')[0].toUpperCase()}</div>
+      <div style=${{flex:1}}><label className="lbl" htmlFor="nm">Display name</label><input id="nm" type="text" value=${st.name} onInput=${e=>set('name',e.target.value)} style=${{marginTop:4}}/></div></div>
+    <div className="card"><div className="h2">Goals</div><${Sl} k="goalMin" label="Daily upright target" min=${30} max=${480} step=${30} u=" min"/><${Sl} k="targetScore" label="Target alignment score" min=${50} max=${95} step=${5} u=""/></div>
+    <div className="card"><div className="h2">Detection</div>
+      <div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Feedback sensitivity</div><div className="seg">${['relaxed','balanced','strict'].map(k=>html`<button key=${k} className=${st.sensitivity===k?'on':''} onClick=${()=>{set('sensitivity',k);toast(`Sensitivity: ${k} · slouch > ${SENS[k].slouch}°`)}}>${k[0].toUpperCase()+k.slice(1)}</button>`)}</div>
+        <div className="tiny" style=${{marginTop:6}}>Slouch > ${SENS[st.sensitivity].slouch}° · lean > ±${SENS[st.sensitivity].lean}° · bend > ${SENS[st.sensitivity].bend}°</div></div>
+      <${Sl} k="alertDelay" label="Slouch detection duration" min=${5} max=${60} step=${5} u=" s"/><${Sl} k="vibIntensity" label="Vibration intensity" min=${10} max=${100} step=${5} u="%"/></div>
+    <div className="card"><div className="h2">Notifications</div><${Tog} k="banners" label="In-app alert banners" sub="Show a banner when a haptic nudge fires"/><${Tog} k="dailySummary" label="Daily summary" sub="Evening recap of posture time"/><${Tog} k="weekly" label="Weekly report" sub="Trend digest every Monday"/></div>
+    <div className="card"><div className="h2">Preferences</div><div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Angle units</div><div className="seg">${[['deg','Degrees'],['rad','Radians']].map(([k,n])=>html`<button key=${k} className=${st.units===k?'on':''} onClick=${()=>set('units',k)}>${n}</button>`)}</div></div>
+      <div className="setrow row" style=${{gap:8}}><button className="btn sm" style=${{flex:1}} onClick=${replay}>Replay onboarding</button><button className="btn sm warn" style=${{flex:1}} onClick=${()=>{S.saved=[];store.set('saved',[]);S.calib={done:false,p:0,r:0,at:null};store.set('calib',S.calib);S.sess=newSession();toast('Demo data and calibration cleared','#8EB2AF','reset')}}>Reset demo data</button></div></div>
+    <p className="tiny" style=${{textAlign:'center',padding:'0 10px'}}>ALIGNA is a proof-of-concept for DH803 (PostureSense). The alignment score is an app-defined metric from IMU tilt angles. It is not a medical measurement or diagnosis.</p>
+  </div>`}
+
+/* ---------------- ONBOARDING ---------------- */
+function Onboarding({done}){const[i,setI]=useState(0);
+  const pages=[
+    {t:'Your posture. Your balance. Your wellbeing.',s:'ALIGNA pairs with the PostureSense wearable to show how you sit and stand, as it happens.',pic:html`<div style=${{display:'grid',placeItems:'center',gap:16}}><${Logo} s=${112}/><b style=${{letterSpacing:'.3em',fontSize:26}}>ALIGNA</b></div>`},
+    {t:'A tiny sensor on your upper back',s:'A 6-axis IMU (MPU6050) senses tilt and rotation. The ESP32 filters the signal and estimates your trunk angles.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${0} color="#3CF2B4" haptic=${true} uid="o1"/></div>`},
+    {t:'A gentle nudge when you slouch',s:'Hold a poor posture too long and the device vibrates. You choose how long and how strong.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${22} color="#FFB547" haptic=${true} uid="o2"/></div>`},
+    {t:'Calibrate your neutral',s:'Sit tall for five seconds so ALIGNA learns your upright position and the sensor’s mounting angle.',pic:html`<div style=${{display:'grid',placeItems:'center'}}><${Puck} buzz=${false} color="#3CF2B4"/></div>`}];
+  const p=pages[i];
+  return html`<div className="overlay" style=${{background:'radial-gradient(500px 400px at 50% 25%,#0F3A3A,transparent 70%),var(--bg)'}}>
+    <div className="row between" style=${{padding:'14px 20px 0'}}><span className="tiny">${i+1} / ${pages.length}</span><button className="btn sm" style=${{background:'none',border:0}} onClick=${()=>done(false)}>Skip</button></div>
+    <div key=${i} className="enter" style=${{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'0 28px'}}>
+      <div style=${{minHeight:290,display:'grid',placeItems:'center'}}>${p.pic}</div>
+      <h2 className="h1" style=${{fontSize:28,textWrap:'balance',marginTop:10}}>${p.t}</h2><p className="sub" style=${{fontSize:15.5,color:'var(--ink)',opacity:.8}}>${p.s}</p></div>
+    <div style=${{padding:'0 24px 34px'}}><div className="dots" style=${{marginBottom:18}}>${pages.map((_,j)=>html`<i key=${j} className=${j===i?'on':''}></i>`)}</div>
+      ${i<pages.length-1?html`<button className="btn pri full" onClick=${()=>setI(i+1)}>Continue</button>`:html`<div className="row" style=${{gap:8}}><button className="btn" style=${{flex:1}} onClick=${()=>done(false)}>Later</button><button className="btn pri" style=${{flex:1.4}} onClick=${()=>done(true)}>Calibrate now</button></div>`}</div></div>`}
+
+/* ---------------- DEMO SHEET ---------------- */
+const DEMO_OPTS=[['auto','Auto','#3CF2B4'],...PKEYS.map(k=>[k,POSTURES[k].label,POSTURES[k].color])];
+function DemoSheet({close}){useTick();const sim_=S.link.kind==='simulated';
+  return html`<${React.Fragment}><div className="sheetBg" onClick=${close}></div><div className="sheet" role="dialog" aria-label="Demo controls">
+    <div className="grab"></div><div className="row between"><b style=${{fontSize:17}}>Demo controls</b><button className="iconbtn" onClick=${close} aria-label="Close"><${Icon} n="x" s=${16}/></button></div>
+    <p className="sub" style=${{margin:'4px 0 12px'}}>${sim_?'Drive the simulated wearer. Values change smoothly, like a real body.':'A real sensor source is active. Demo controls only drive the simulator; start the demo source on the Device tab to use them.'}</p>
+    <div className="pgrid">${DEMO_OPTS.map(([k,n,c])=>html`<button key=${k} className=${'pbtn'+(sim.mode===k?' on':'')} style=${{color:sim.mode===k?c:'var(--ink)'}} disabled=${!sim_} onClick=${()=>{sim.setMode(k);toast(k==='auto'?'Auto demo: random realistic transitions':`Simulating: ${n}`,c,'flask')}}>
+      <span style=${{width:26,height:26,borderRadius:9,background:c+'22',display:'grid',placeItems:'center'}}><i style=${{width:9,height:9,borderRadius:5,background:c}}></i></span>${n}</button>`)}</div>
+    <button className="btn full" style=${{marginTop:12}} onClick=${()=>fireHaptic('manual trigger',true)}><${Icon} n="vib" s=${18}/>Trigger haptic nudge</button></div><//>`}
+
+/* ---------------- SIDE CONSOLE (desktop) ---------------- */
+function Console({replay}){useTick();const L=S.live,on=S.link.status==='streaming',sim_=S.link.kind==='simulated',th=SENS[S.settings.sensitivity],P=POSTURES[L.cls];
+  const nodes=[['IMU sample','MPU6050 · ax ay az · gx gy gz',on?`${L.ay.toFixed(2)} g · ${L.gyroMag.toFixed(0)}°/s`:'–'],['Calibration','subtract saved neutral',S.calib.done?`−${S.calib.p.toFixed(1)}°`:'not set'],
+    ['Filtering','complementary, α = 0.98',on?`${L.pAbs.toFixed(1)}° raw`:'–'],['Angle estimation','forward tilt · lateral tilt',on?`${L.p.toFixed(1)}° · ${L.r.toFixed(1)}°`:'–'],
+    ['Classification',`threshold rules · ML slot (DT/SVM/RF)`,on?P.label:'–'],['Feedback',`vibrate after ${S.settings.alertDelay} s`,on?(P.kind==='poor'?`${L.bad.toFixed(0)} / ${S.settings.alertDelay} s`:'idle'):'–']];
+  const hot=!on?-1:P.kind==='poor'?5:4;
+  return html`<aside className="side">
+    <div className="brand"><${Logo} s=${60}/><div><h1>ALIGNA</h1><p className="tag">Your posture. Your balance. Your wellbeing.</p></div></div>
+    <p style=${{color:'var(--mute)',maxWidth:520,margin:'18px 0 22px'}}>Companion app for <b style=${{color:'var(--ink)'}}>PostureSense</b>, a single-IMU wearable that detects upright, slouch, left/right lean, forward bend and movement, and nudges you with vibration. DH803 Wearable Health Technology · IIT Bombay.</p>
+    <div className="row between" style=${{marginBottom:10}}><b>Signal pipeline · live</b><span className="chip demoPill" style=${{height:26}}>${src().tag}</span></div>
+    ${nodes.map(([a,b,v],i)=>html`<div key=${a} className=${'pn'+(i<=hot&&on?' hot':'')}><span className="ix">${i+1}</span><div><b>${a}</b><span>${b}</span></div><span className="vv" style=${{color:i===4&&on?P.color:undefined}}>${v}</span></div>`)}
+    <div style=${{margin:'22px 0 10px'}}><b>Demo controls</b><span className="tiny"> · drive the simulated wearer</span></div>
+    <div className="sideBtns">${DEMO_OPTS.map(([k,n,c])=>html`<button key=${k} className=${sim.mode===k?'on':''} disabled=${!sim_} onClick=${()=>{sim.setMode(k);toast(k==='auto'?'Auto demo: random realistic transitions':`Simulating: ${n}`,c,'flask')}}>${n}</button>`)}
+      <button onClick=${()=>fireHaptic('manual trigger',true)}>Trigger haptic</button><button onClick=${replay}>Replay onboarding</button></div>
+    <p className="tiny" style=${{marginTop:18,maxWidth:520}}>Thresholds (${S.settings.sensitivity}): slouch > ${th.slouch}°, lean > ±${th.lean}°, bend > ${th.bend}°, movement when gyro magnitude > 30 °/s. ${sim_?'All values on this page come from the in-app simulator until a real sensor is connected.':S.link.kind==='phone'?'Live values come from the iPhone motion sensors, not the PostureSense hardware.':'Live values come from the connected ESP32.'}</p>
+  </aside>`}
+
+/* ---------------- APP SHELL ---------------- */
+const TABS=[['home','Home','home'],['live','Live','live'],['session','Session','sess'],['trends','Trends','trend'],['device','Device','dev']];
+function Clock(){useTick();const d=new Date();return html`<span className="num">${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</span>`}
+function App(){
+  useTick();const[tab,setTab]=useState(()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)||h==='profile'?h:'home'});
+  const[onb,setOnb]=useState(!S.onboarded);const[cal,setCal]=useState(false);const[demo,setDemo]=useState(false);const[shake,setShake]=useState(false);
+  const[scale,setScale]=useState(1);const scr=useRef(null);
+  useEffect(()=>{const f=()=>setScale(Math.min(1,(window.innerHeight-48)/844));f();window.addEventListener('resize',f);shakeFn=()=>{setShake(true);setTimeout(()=>setShake(false),520)};return()=>window.removeEventListener('resize',f)},[]);
+  useEffect(()=>{const f=()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)||h==='profile')setTab(h)};window.addEventListener('hashchange',f);return()=>window.removeEventListener('hashchange',f)},[]);
+  const go=t=>{setTab(t);try{history.replaceState(null,'','#'+t)}catch(e){}if(scr.current)scr.current.scrollTop=0};
+  const finishOnb=calNow=>{setOnb(false);S.onboarded=true;store.set('onboarded',true);if(calNow){go('device');setCal(true)}};
+  const replay=()=>{setOnb(true)};
+  const screen={home:html`<${Home} go=${go} openDemo=${()=>setDemo(true)} openCal=${()=>setCal(true)}/>`,live:html`<${Live}/>`,session:html`<${Session}/>`,trends:html`<${Trends}/>`,device:html`<${Device} openCal=${()=>setCal(true)}/>`,profile:html`<${Profile} back=${()=>go('home')} replay=${replay}/>`}[tab];
+  return html`<div className="stage"><${Console} replay=${replay}/>
+    <div className="phoneWrap" style=${{width:390*scale,height:844*scale}}>
+      <div className=${'phone'+(shake?' shake':'')} style=${{transform:`scale(${scale})`}}>
+        <div className="island"></div>
+        <div className="statusbar"><${Clock}/><span className="row" style=${{gap:6}}><${Icon} n="wifi" s=${16} w=${2}/><svg width="26" height="13" viewBox="0 0 26 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="16" height="8" rx="2" fill="currentColor"/><rect x="23.5" y="4" width="2" height="5" rx="1" fill="currentColor" opacity=".5"/></svg></span></div>
+        <div className="screen" ref=${scr}><div key=${tab} className="enter">${screen}</div></div>
+        ${Share.status!=='off'&&tab!=='device'&&html`<button className="chip" onClick=${()=>go('device')} style=${{position:'absolute',left:'50%',transform:'translateX(-50%)',bottom:92,zIndex:21,background:'#0E2A31',color:Share.status==='live'?'#3CF2B4':'#FFB547'}}><span className=${Share.status==='live'?'pulseDot':''} style=${{width:8,height:8,borderRadius:4,background:'currentColor',display:'inline-block'}}></span>${Share.status==='live'?'Sharing live':'Waiting for display'} · <span className="mono">${Share.code||''}</span></button>`}
+        <nav className="nav">${TABS.map(([k,n,ic])=>html`<button key=${k} className=${tab===k?'on':''} onClick=${()=>go(k)} aria-label=${n}><${Icon} n=${ic} s=${22}/>${n}</button>`)}</nav>
+        <div className="toasts">${S.toasts.map(t=>html`<div className="toast" key=${t.id}><span style=${{color:t.color,display:'grid'}}><${Icon} n=${t.icon} s=${18}/></span><span>${t.text}</span></div>`)}</div>
+        ${demo&&html`<${DemoSheet} close=${()=>setDemo(false)}/>`}
+        ${cal&&html`<${Calibration} close=${()=>setCal(false)}/>`}
+        ${onb&&html`<${Onboarding} done=${finishOnb}/>`}
+      </div></div></div>`}
+ReactDOM.createRoot(document.getElementById('root')).render(html`<${App}/>`);
+}
+</script>
+</body>
+</html>
