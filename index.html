@@ -301,7 +301,7 @@ function speak(t){try{const u=new SpeechSynthesisUtterance(t);speechSynthesis.ca
 let wakeLock=null;
 async function keepAwake(on){try{if(on&&'wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen')}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.link.kind==='phone'&&S.link.status==='streaming')keepAwake(true)});
-const SRC={simulated:{chip:'Demo stream',sub:'simulated',tag:'SIMULATED',ico:'flask',title:'DEMO DATA · simulated IMU',body:'Generated in the app to mimic an MPU6050. These are not measurements from your device.',transport:'In-app simulator',imu:'MPU6050 model · simulated',data:'simulated data'},
+const SRC={simulated:{chip:'Demo stream',sub:'simulated',tag:'SIMULATED',ico:'flask',title:'DEMO DATA · simulated IMU',body:'Generated in the app to mimic a 6-axis IMU. These are not measurements from your device.',transport:'In-app simulator',imu:'MPU6050 model · simulated',data:'simulated data'},
   phone:{chip:'iPhone live',sub:'real sensors',tag:'IPHONE IMU',ico:'dev',title:'REAL DATA · iPhone motion sensors',body:"Live readings from this iPhone's accelerometer and gyroscope. Real data, but not the PostureSense hardware.",transport:'Built-in (Safari DeviceMotion)',imu:'iPhone accelerometer + gyroscope',data:'iPhone sensor data'},
   ble:{chip:'ESP32 live',sub:'BLE',tag:'HARDWARE',ico:'bt',title:'HARDWARE DATA · ESP32',body:'Readings received from the connected wearable.',transport:'Bluetooth LE',imu:'MPU6050 · responding',data:'device data'}};
 SRC.remote={chip:'iPhone via link',sub:'live link',tag:'IPHONE · LINKED',ico:'wifi',title:'REAL DATA · iPhone sensors over live link',body:"Streaming from the paired iPhone's accelerometer and gyroscope. Real data, but not the PostureSense hardware.",transport:'WebRTC peer-to-peer',imu:'iPhone accelerometer + gyroscope (remote)',data:'linked iPhone data'};
@@ -378,7 +378,8 @@ function alignScore(p,r){return clamp(100-2.3*Math.max(0,p-4)-1.6*Math.max(0,-p-
 
 /* ---------- 5. Session tracker ---------- */
 function newSession(){return{id:Date.now(),startedAt:new Date(),elapsed:0,running:true,time:Object.fromEntries(PKEYS.map(k=>[k,0])),scoreSum:0,scoreT:0,
-  events:{slouch:0,left:0,right:0,bend:0},alerts:0,longestGood:0,goodStreak:0,segs:[],hist:[],histT:0}}
+  events:{slouch:0,left:0,right:0,bend:0,moving:0},nudgeBy:{slouch:0,left:0,right:0,bend:0},episodes:0,nudgedEp:0,corr:[],pendingCorr:null,log:[],logT:0,
+  alerts:0,longestGood:0,goodStreak:0,segs:[],hist:[],histT:0,src:null}}
 
 /* ---------- 6. Engine / store ---------- */
 const BUFN=750;
@@ -415,18 +416,69 @@ function onSample(s){
   if(cls!==prev){L.since=0;const ss=S.sess;if(ss.running&&ss.events[cls]!==undefined)ss.events[cls]++}else L.since+=s.dt;
   // 4. feedback controller
   const kind=POSTURES[cls].kind;
-  if(kind==='poor'){S.fb.bad+=s.dt;if(!S.fb.fired&&S.fb.bad>=S.settings.alertDelay){S.fb.fired=true;fireHaptic(`${POSTURES[cls].label} held for ${Math.round(S.fb.bad)} s`)}}
-  else if(kind==='good'){S.fb.bad=0;S.fb.fired=false}
+  const SS=S.sess,evQuiet=S.ev&&S.ev.running&&S.ev.noNudge;
+  if(kind==='poor'){if(S.fb.bad===0&&SS.running)SS.episodes++;S.fb.bad+=s.dt;
+    if(!S.fb.fired&&S.fb.bad>=S.settings.alertDelay&&!evQuiet){S.fb.fired=true;if(SS.running){SS.nudgeBy[cls]++;SS.nudgedEp++;SS.pendingCorr=SS.elapsed}fireHaptic(`${POSTURES[cls].label} held for ${Math.round(S.fb.bad)} s`)}}
+  else if(kind==='good'){S.fb.bad=0;S.fb.fired=false;if(SS.pendingCorr!=null){SS.corr.push(SS.elapsed-SS.pendingCorr);SS.pendingCorr=null}}
   L.bad=S.fb.bad;
   // 5. session
   const ss=S.sess;if(ss.running){ss.elapsed+=s.dt;ss.time[cls]+=s.dt;if(kind!=='active'){ss.scoreSum+=S.score*s.dt;ss.scoreT+=s.dt}
     if(kind==='good'){ss.goodStreak+=s.dt;ss.longestGood=Math.max(ss.longestGood,ss.goodStreak)}else if(kind==='poor')ss.goodStreak=0;
     const last=ss.segs[ss.segs.length-1];if(last&&last.c===cls)last.t1=ss.elapsed;else ss.segs.push({c:cls,t0:ss.elapsed-s.dt,t1:ss.elapsed});
-    ss.histT+=s.dt;if(ss.histT>=1){ss.histT=0;ss.hist.push(S.score)}}
+    ss.histT+=s.dt;if(ss.histT>=1){ss.histT=0;ss.hist.push(S.score)}
+    if(!ss.src)ss.src=S.link.kind;ss.logT+=s.dt;if(ss.logT>=.1){ss.logT=0;if(ss.log.length<36000)ss.log.push([+ss.elapsed.toFixed(2),cls,+p.toFixed(2),+r.toFixed(2),+gyroMag.toFixed(1),+S.score.toFixed(1),S.ev&&S.ev.running?S.ev.steps[S.ev.idx]||'':''])}}
+  // labelled evaluation (ground truth from a scripted protocol)
+  const E=S.ev;if(E&&E.running){E.t+=s.dt;const idx=Math.floor(E.t/E.hold);
+    if(idx>=E.steps.length)finishEval(false);
+    else{if(idx!==E.idx){if(E.idx>=0&&!E.found)E.lat.push({y:E.steps[E.idx],d:null});E.idx=idx;E.found=false;const y0=E.steps[idx];cue(`${POSTURES[y0].label}. ${EVAL_TXT[y0]}`)}
+      const y=E.steps[idx],ts=E.t-idx*E.hold,tr=ts<E.gap;
+      if(!E.found&&cls===y){E.found=true;E.lat.push({y,d:ts})}
+      E.logT+=s.dt;if(E.logT>=.1){E.logT=0;E.rows.push([+E.t.toFixed(2),y,cls,tr?1:0,+p.toFixed(2),+r.toFixed(2),+gyroMag.toFixed(1)])}}}
   // ring buffer for charts
   if(!S.livePaused){const b=S.buf;const vals={t:s.t,ax:s.ax,ay:s.ay,az:s.az,gx:s.gx,gy:s.gy,gz:s.gz,p,r};for(const key in vals)b.ch[key][b.head]=vals[key];b.head=(b.head+1)%BUFN;b.n=Math.min(BUFN,b.n+1)}
 }
 let shakeFn=null;
+/* ---------- CSV export (download where allowed, always copied to clipboard as backup) ---------- */
+function toCSV(rows){return rows.map(r=>r.map(v=>{const x=v==null?'':String(v);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x}).join(',')).join('\n')}
+function exportCSV(name,rows){const csv=toCSV(rows);let ok=false;
+  try{const u=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);ok=true}catch(e){}
+  try{navigator.clipboard&&navigator.clipboard.writeText(csv).catch(()=>{})}catch(e){}
+  toast(`${name} exported${ok?'':' (copied to clipboard)'}`,'#3CF2B4','save')}
+const stamp=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`};
+function sessionStats(ss){const t=ss.time,poor=t.slouch+t.left+t.right+t.bend,stat=t.upright+poor,gp=stat?t.upright/stat*100:0;
+  const avgCorr=ss.corr.length?ss.corr.reduce((a,b)=>a+b,0)/ss.corr.length:null;
+  const devs=['slouch','left','right','bend'],top=devs.reduce((m,k)=>(ss.events[k]>ss.events[m]||(ss.events[k]===ss.events[m]&&t[k]>t[m]))?k:m,'slouch');
+  const uniq=devs.filter(k=>ss.events[k]===ss.events[top]).length===1;
+  return{poor,stat,gp,avg:ss.scoreT?ss.scoreSum/ss.scoreT:0,avgCorr,top:ss.events[top]>0&&uniq?top:null,nudges:devs.reduce((a,k)=>a+ss.nudgeBy[k],0)}}
+function sessionSummaryRows(ss){const st=sessionStats(ss),r1=v=>v==null?'':+v.toFixed(1);
+  const rows=[['metric','value','unit / note'],['started',ss.startedAt.toISOString(),''],['data_source',ss.src||S.link.kind,'simulated | phone | remote (linked iPhone) | ble'],
+    ['calibrated',S.calib.done?'yes':'no',''],['sensitivity',S.settings.sensitivity,JSON.stringify(SENS[S.settings.sensitivity])],['nudge_delay',S.settings.alertDelay,'s'],
+    ['duration',r1(ss.elapsed),'s'],['good_posture_pct',r1(st.gp),'upright / (upright + poor); movement excluded'],['poor_posture_pct',st.stat?r1(100-st.gp):'','(slouch+left+right+bend) / (upright + poor)'],
+    ['avg_alignment_score',r1(st.avg),'app-defined 0-100, not clinical; movement excluded'],['longest_upright_streak',r1(ss.longestGood),'s']];
+  PKEYS.forEach(k=>rows.push([`time_${k}`,r1(ss.time[k]),'s']));PKEYS.forEach(k=>rows.push([`events_${k}`,ss.events[k],'entries into posture']));
+  ['slouch','left','right','bend'].forEach(k=>rows.push([`nudges_${k}`,ss.nudgeBy[k],'']));
+  rows.push(['nudges_total',st.nudges,''],['poor_episodes',ss.episodes,'poor posture until next upright'],['poor_episodes_nudged_pct',ss.episodes?r1(ss.nudgedEp/ss.episodes*100):'','%'],
+    ['avg_time_to_correct_after_nudge',r1(st.avgCorr),'s, nudge to upright'],['most_frequent_deviation',st.top?POSTURES[st.top].label:'','by event count']);return rows}
+const SHORT={upright:'Upright',slouch:'Slouch',left:'Left',right:'Right',bend:'Bend',moving:'Move'};
+const EVAL_TXT={upright:'Sit tall, shoulders relaxed.',slouch:'Round your upper back forward, as if at a laptop.',left:'Lean your upper body to the left.',right:'Lean your upper body to the right.',bend:'Bend forward deeply from the hips.',moving:'Move freely: reach, twist, shift in the chair.'};
+const EVAL_PROTO=['upright','slouch','upright','left','upright','right','upright','bend','upright','moving'];
+function cue(t){if(!S.settings.voice)return;if(S.link.kind==='remote'&&source&&source.send)source.send({k:'say',text:t});else speak(t)}
+function startEval(hold,reps,noNudge){const steps=[];for(let i=0;i<reps;i++)steps.push(...EVAL_PROTO);S.fb.bad=0;S.fb.fired=false;unlockAudio();
+  S.ev={running:true,steps,hold,reps,gap:3,t:0,idx:-1,found:false,lat:[],rows:[],logT:0,noNudge,res:null}}
+function finishEval(stopped){const E=S.ev;if(!E||!E.running)return;E.running=false;if(E.idx>=0&&!E.found&&E.idx<E.steps.length)E.lat.push({y:E.steps[E.idx],d:null});
+  const rows=E.rows.filter(r=>!r[3]),M=Object.fromEntries(PKEYS.map(a=>[a,Object.fromEntries(PKEYS.map(b=>[b,0]))]));rows.forEach(r=>M[r[1]][r[2]]++);
+  const n=rows.length,correct=PKEYS.reduce((a,k)=>a+M[k][k],0);
+  const per=PKEYS.map(k=>{const tp=M[k][k],fp=PKEYS.reduce((a,j)=>a+(j!==k?M[j][k]:0),0),fn=PKEYS.reduce((a,j)=>a+(j!==k?M[k][j]:0),0),sup=tp+fn;
+    const P=tp+fp?tp/(tp+fp):null,Rc=sup?tp/sup:null,F=P!=null&&Rc!=null&&P+Rc>0?2*P*Rc/(P+Rc):(P===0||Rc===0?0:null);
+    const ls=E.lat.filter(l=>l.y===k),det=ls.filter(l=>l.d!=null).map(l=>l.d).sort((a,b)=>a-b);
+    return{k,tp,fp,fn,sup,P,R:Rc,F,lat:det.length?det[Math.floor((det.length-1)/2)]:null,miss:ls.length-det.length,steps:ls.length}});
+  const used=per.filter(x=>x.sup>0);
+  E.res={n,acc:n?correct/n:null,M,per,macroF:used.length?used.reduce((a,x)=>a+(x.F||0),0)/used.length:null,at:Date.now(),stopped:!!stopped,hold:E.hold,reps:E.reps,src:S.link.kind,calibrated:S.calib.done,sens:S.settings.sensitivity,rows:E.rows};
+  store.set('evalLast',{...E.res,rows:undefined});toast(stopped?'Evaluation stopped · partial results':'Evaluation complete');cue('Evaluation complete.')}
+function evalRows(res){const f=v=>v==null?'':+v.toFixed(3),o=[['metric','value'],['samples_scored (10 Hz, first 3 s of each step excluded)',res.n],['accuracy',f(res.acc)],['macro_F1',f(res.macroF)],['source',res.src],['calibrated',res.calibrated?'yes':'no'],['sensitivity',res.sens],['hold_s',res.hold],['repetitions',res.reps],[],
+  ['class','support','TP','FP','FN','precision','recall','F1','median_detection_latency_s','steps_never_detected']];
+  res.per.forEach(x=>o.push([x.k,x.sup,x.tp,x.fp,x.fn,f(x.P),f(x.R),f(x.F),f(x.lat),x.miss]));o.push([],['confusion matrix: rows = true, columns = predicted'],['true \\ predicted',...PKEYS]);
+  PKEYS.forEach(a=>o.push([a,...PKEYS.map(b=>res.M[a][b])]));return o}
 function fireHaptic(reason,test){
   S.fb.hapticAt=performance.now();if(!test&&S.sess.running)S.sess.alerts++;
   if(S.link.kind==='remote'){source&&source.send&&source.send({k:'nudge',text:reason});shakeFn&&shakeFn();
@@ -680,19 +732,19 @@ function Live(){
       <${Chart} keys=${['p','r']} colors=${['#FFB547','#B69CFF']} win=${win} fixed=${[-25,65]} bands=${[[th.slouch,'rgba(255,181,71,.5)'],[th.bend,'rgba(255,107,122,.5)'],[th.lean,'rgba(182,156,255,.45)'],[-th.lean,'rgba(182,156,255,.45)']]} h=${150}/>
       <div className="tiny" style=${{marginTop:6}}>Dashed lines: current ${S.settings.sensitivity} thresholds (slouch ${th.slouch}°, bend ${th.bend}°, lean ±${th.lean}°).</div></div>
     <div className="card"><div className="h2" style=${{marginBottom:10}}>Processing pipeline</div>
-      <div className="pipe">${[['IMU','50 Hz'],['Calibration',S.calib.done?'offset saved':'not set'],['Filter','complementary α .98'],['Angles','tilt · lateral'],['Classifier','threshold v0'],['Feedback',`${S.settings.alertDelay} s → haptic`]].map(([a,b],i)=>html`<${React.Fragment} key=${a}>${i>0&&html`<div className="ar">›</div>`}<div><b>${a}</b>${b}</div><//>`)}</div>
+      <div className="pipe">${[['IMU','50 Hz'],['Calibration',S.calib.done?'offset saved':'not set'],['Filter','complementary α .98'],['Angles','tilt · lateral'],['Classifier','threshold v0'],['Feedback',`${S.settings.alertDelay} s → nudge`]].map(([a,b],i)=>html`<${React.Fragment} key=${a}>${i>0&&html`<div className="ar">›</div>`}<div><b>${a}</b>${b}</div><//>`)}</div>
       <div className="tiny" style=${{marginTop:10}}>Axis convention assumed: X → wearer's right, Y → up the spine, Z → out of the back. Confirm against the final strap mounting.</div></div>
   </div>`}
 
 /* ---------------- SESSION ---------------- */
-function Session(){
+function Session({openEval}){
   useTick();const ss=S.sess,t=ss.time,poor=t.slouch+t.left+t.right+t.bend,stat=t.upright+poor,gp=stat?t.upright/stat*100:0,avg=ss.scoreT?ss.scoreSum/ss.scoreT:0;
   const total=Math.max(1,ss.elapsed);const segs=[];for(const s of ss.segs){const l=segs[segs.length-1];if(l&&(s.t1-s.t0)/total<.004){l.t1=s.t1}else segs.push({...s})}
   const drops=ss.segs.filter(s=>POSTURES[s.c].kind==='poor'&&s.t1-s.t0>3).length;
   const longestPoor=ss.segs.filter(s=>POSTURES[s.c].kind==='poor').reduce((m,s)=>s.t1-s.t0>m.d?{d:s.t1-s.t0,at:s.t0}:m,{d:0,at:0});
-  const end=()=>{if(ss.elapsed<5){toast('Session too short to save','#FF6B7A','x');return}const rec={id:ss.id,date:ss.startedAt.toISOString(),dur:ss.elapsed,good:gp,avg,slouch:ss.events.slouch+ss.events.bend,alerts:ss.alerts,demo:S.link.kind==='simulated'};
+  const end=()=>{if(ss.elapsed<5){toast('Session too short to save','#FF6B7A','x');return}const rec={id:ss.id,date:ss.startedAt.toISOString(),dur:ss.elapsed,good:gp,avg,slouch:ss.events.slouch+ss.events.bend,alerts:ss.alerts,demo:(ss.src||S.link.kind)==='simulated',src:ss.src||S.link.kind,events:{...ss.events},nudgeBy:{...ss.nudgeBy},time:{...ss.time}};
     S.saved=[rec,...S.saved].slice(0,12);store.set('saved',S.saved);S.sess=newSession();S.sess.running=false;toast('Session saved to history')};
-  const hist=ss.hist.slice(-240);
+  const hist=ss.hist.slice(-240),st=sessionStats(ss);
   return html`<div>
     <div className="hdr"><div><h1 className="h1">Session</h1><div className="sub">${ss.running?'Recording':'Paused'} · ${src().data}</div></div>
       <span className="chip" style=${{color:ss.running?'#3CF2B4':'#8EB2AF'}}><span className=${ss.running?'pulseDot':''} style=${{width:8,height:8,borderRadius:4,background:'currentColor',display:'inline-block'}}></span>${ss.running?'REC':'Idle'}</span></div>
@@ -702,7 +754,7 @@ function Session(){
         <button className="btn sm" onClick=${()=>{ss.running=!ss.running;toast(ss.running?'Session resumed':'Session paused','#8EB2AF',ss.running?'play':'pause')}}><${Icon} n=${ss.running?'pause':'play'} s=${16}/>${ss.running?'Pause':'Resume'}</button>
         <button className="btn sm pri" onClick=${end}><${Icon} n="save" s=${16}/>End & save</button>
         <button className="btn sm" onClick=${()=>{S.sess=newSession();toast('New session started','#3CF2B4','plus')}}><${Icon} n="plus" s=${16}/>New</button></div></div>
-    <div className="grid3" style=${{marginBottom:12}}>${[['Good',gp.toFixed(0)+'%','#3CF2B4'],['Poor',(stat?100-gp:0).toFixed(0)+'%','#FFB547'],['Avg score',avg.toFixed(0),'var(--ink)'],['Slouch events',ss.events.slouch,'var(--ink)'],['Best streak',fmtT(ss.longestGood),'#3CF2B4'],['Haptic alerts',ss.alerts,'var(--ink)']].map(([l,v,c])=>html`<div className="card stat" key=${l} style=${{padding:12,marginBottom:0,borderRadius:18}}><div className="v" style=${{color:c,fontSize:19}}>${v}</div><div className="l">${l}</div></div>`)}</div>
+    <div className="grid3" style=${{marginBottom:12}}>${[['Good',gp.toFixed(0)+'%','#3CF2B4'],['Poor',(stat?100-gp:0).toFixed(0)+'%','#FFB547'],['Avg score',avg.toFixed(0),'var(--ink)'],['Slouch events',ss.events.slouch,'var(--ink)'],['Best streak',fmtT(ss.longestGood),'#3CF2B4'],['Nudges',ss.alerts,'var(--ink)']].map(([l,v,c])=>html`<div className="card stat" key=${l} style=${{padding:12,marginBottom:0,borderRadius:18}}><div className="v" style=${{color:c,fontSize:19}}>${v}</div><div className="l">${l}</div></div>`)}</div>
     <div className="card"><div className="row between"><span className="h2">Posture timeline</span><span className="tiny">${fmtT(ss.elapsed)}</span></div>
       <div className="tl" style=${{marginTop:12}}>${segs.map((s,i)=>html`<i key=${i} title=${POSTURES[s.c].label} style=${{width:(s.t1-s.t0)/total*100+'%',background:POSTURES[s.c].color,opacity:POSTURES[s.c].kind==='good'?.75:1}}></i>`)}</div>
       <div className="row between tiny" style=${{marginTop:4}}><span>0:00</span><span>${fmtT(total/2)}</span><span>${fmtT(total)}</span></div>
@@ -713,7 +765,19 @@ function Session(){
       <div className="legend" style=${{marginTop:10}}>${PKEYS.map(k=>html`<span key=${k}><i style=${{background:POSTURES[k].color,height:8,width:8}}></i>${POSTURES[k].label}</span>`)}</div>
       <div style=${{marginTop:12,fontSize:13}}>${drops?html`Posture deteriorated <b>${drops}</b> time${drops>1?'s':''} for more than 3 s. Longest poor stretch: <b>${fmtT(longestPoor.d)}</b> starting at ${fmtT(longestPoor.at)}.`:'No sustained poor posture yet.'}</div></div>
     <div className="card"><div className="h2">Time in each posture</div>
-      ${PKEYS.map(k=>html`<div className="hrow" key=${k}><span>${POSTURES[k].label}</span><div className="bar"><i style=${{width:(t[k]/total*100)+'%',background:POSTURES[k].color}}></i></div><span className="t">${fmtT(t[k])}</span></div>`)}</div>
+      ${PKEYS.map(k=>html`<div className="hrow" key=${k}><span>${POSTURES[k].label}</span><div className="bar"><i style=${{width:(t[k]/total*100)+'%',background:POSTURES[k].color}}></i></div><span className="t">${fmtT(t[k])}</span></div>`)}
+      <div className="tiny" style=${{marginTop:8}}>Good % = upright ÷ (upright + poor postures). Movement is excluded from both.</div></div>
+    <div className="card"><div className="row between"><span className="h2">Events and nudges</span>${st.top&&html`<span className="chip" style=${{color:POSTURES[st.top].color}}>Most frequent: ${POSTURES[st.top].label}</span>`}</div>
+      <table style=${{marginTop:8}}><thead><tr><th>Posture</th><th className="r">Events</th><th className="r">Nudges</th><th className="r">Time</th></tr></thead><tbody>
+      ${['slouch','left','right','bend','moving'].map(k=>html`<tr key=${k}><td><span className="row" style=${{gap:7}}><i style=${{width:9,height:9,borderRadius:3,background:POSTURES[k].color,display:'inline-block'}}></i>${POSTURES[k].label}</span></td><td className="r">${ss.events[k]}</td><td className="r">${k==='moving'?'–':ss.nudgeBy[k]}</td><td className="r">${fmtT(t[k])}</td></tr>`)}</tbody></table>
+      <div className="grid3" style=${{marginTop:12}}>${[['Poor episodes',ss.episodes],['Nudged',ss.episodes?Math.round(ss.nudgedEp/ss.episodes*100)+'%':'–'],['Correct after nudge',st.avgCorr!=null?st.avgCorr.toFixed(1)+' s':'–']].map(([l,v])=>html`<div className="chan" key=${l}><div className="n">${l}</div><div className="v mono">${v}</div></div>`)}</div>
+      <div className="tiny" style=${{marginTop:8}}>An episode runs from leaving upright until returning upright. "Correct after nudge" is the average time from a nudge to upright.</div></div>
+    <div className="card"><div className="h2" style=${{marginBottom:10}}>Data and evaluation</div>
+      <div className="row" style=${{gap:8,flexWrap:'wrap'}}>
+        <button className="btn sm" disabled=${!ss.log.length} onClick=${()=>exportCSV(`aligna-timeline-${stamp()}.csv`,[['t_s','predicted','tilt_deg','lateral_deg','gyro_dps','score','true_label'],...ss.log])}><${Icon} n="save" s=${16}/>Timeline CSV</button>
+        <button className="btn sm" onClick=${()=>exportCSV(`aligna-summary-${stamp()}.csv`,sessionSummaryRows(ss))}><${Icon} n="save" s=${16}/>Summary CSV</button>
+        <button className="btn sm pri" onClick=${openEval}><${Icon} n="target" s=${16}/>Labelled evaluation</button></div>
+      <div className="tiny" style=${{marginTop:8}}>Timeline is logged at 10 Hz. Labelled evaluation runs a scripted posture protocol to measure accuracy, precision, recall, F1 and detection latency.</div></div>
     ${S.saved.length>0&&html`<div className="card"><div className="h2" style=${{marginBottom:6}}>Saved sessions</div>
       <table><thead><tr><th>Date</th><th className="r">Length</th><th className="r">Good</th><th className="r">Score</th></tr></thead><tbody>
       ${S.saved.slice(0,5).map(r=>html`<tr key=${r.id}><td>${new Date(r.date).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}${r.demo?html` <span className="tiny" style=${{color:'#FFB547'}}>demo</span>`:''}</td><td className="r">${fmtT(r.dur)}</td><td className="r">${r.good.toFixed(0)}%</td><td className="r">${r.avg.toFixed(0)}</td></tr>`)}</tbody></table></div>`}
@@ -838,8 +902,8 @@ function Device({openCal}){
     <div className="hdr"><div><h1 className="h1">Device</h1><div className="sub">PostureSense wearable</div></div></div>
     <div className="card" style=${{textAlign:'center',paddingTop:20}}>
       <div style=${{display:'grid',placeItems:'center'}}><${Puck} buzz=${buzz} color=${on?(sim?'#FFB547':'#3CF2B4'):'#FF6B7A'}/></div>
-      <div style=${{fontWeight:600,fontSize:18,marginTop:6}}>${sim?'Virtual PostureSense':'PostureSense prototype'}</div>
-      <div className="sub">ESP32-WROOM-32 · MPU6050 · 3.7 V Li-Po · ERM motor</div>
+      <div style=${{fontWeight:600,fontSize:18,marginTop:6}}>${sim?'Virtual sensor (demo)':ph||l.kind==='remote'?'iPhone sensing prototype':'PostureSense wearable'}</div>
+      <div className="sub">${sim?'Simulated 6-axis IMU · for demonstration only':ph||l.kind==='remote'?'iPhone on upper back · tablet display · WebRTC live link':'ESP32 · MPU6050 (future hardware)'}</div>
       <div className="row" style=${{justifyContent:'center',marginTop:14,gap:8,flexWrap:'wrap'}}>
         ${on?html`<button className="btn sm warn" onClick=${disconnect}><${Icon} n="x" s=${16}/>Disconnect</button>`:html`<button className="btn sm pri" disabled=${l.status==='connecting'} onClick=${()=>connect('simulated')}><${Icon} n="reset" s=${16}/>${l.status==='connecting'?'Connecting…':'Start demo source'}</button>`}
         <button className="btn sm" onClick=${async()=>{await connect('ble');if(S.link.err){setNote(S.link.err);connect('simulated')}}}><${Icon} n="bt" s=${16}/>Connect ESP32</button></div>
@@ -851,13 +915,13 @@ function Device({openCal}){
       <span className="chip" style=${{color:S.calib.done?'#3CF2B4':'#FFB547'}}>${S.calib.done?'Calibrated':'Required'}</span></div>
       ${S.calib.done&&html`<div className="grid2" style=${{marginTop:12}}><div className="chan"><div className="n">Mounting offset · tilt</div><div className="v mono">${fmtA(S.calib.p)}</div></div><div className="chan"><div className="n">Mounting offset · lateral</div><div className="v mono">${fmtA(S.calib.r)}</div></div></div>`}
       <button className="btn pri full" style=${{marginTop:14}} onClick=${openCal}><${Icon} n="target" s=${18}/>${S.calib.done?'Recalibrate':'Start calibration'}</button></div>
-    <div className="card"><div className="row between"><div className="h2">Vibration feedback</div><button className=${'tog'+(st.vibOn?' on':'')} role="switch" aria-checked=${st.vibOn} aria-label="Vibration on" onClick=${()=>set('vibOn',!st.vibOn)}></button></div>
+    <div className="card"><div className="row between"><div><div className="h2">Nudge feedback</div><div className="tiny">Current prototype: chime + spoken cue on the iPhone. Vibration settings apply to the future ESP32 wearable.</div></div><button className=${'tog'+(st.vibOn?' on':'')} role="switch" aria-checked=${st.vibOn} aria-label="Vibration on" onClick=${()=>set('vibOn',!st.vibOn)}></button></div>
       <div className="setrow"><div className="row between" style=${{fontSize:13}}><span>Intensity</span><b className="num">${st.vibIntensity}%</b></div><input type="range" min="10" max="100" step="5" value=${st.vibIntensity} onInput=${e=>set('vibIntensity',+e.target.value)}/>
         <div className="tiny">Maps to PWM duty on the motor driver (2N2222) once firmware supports it.</div></div>
       <div className="setrow"><div style=${{fontSize:13,marginBottom:8}}>Pattern</div><div className="seg">${[['pulse','Pulse'],['double','Double'],['long','Long']].map(([k,n])=>html`<button key=${k} className=${st.vibPattern===k?'on':''} onClick=${()=>set('vibPattern',k)}>${n}</button>`)}</div></div>
       <div className="setrow"><div className="row between" style=${{fontSize:13}}><span>Alert after poor posture for</span><b className="num">${st.alertDelay} s</b></div><input type="range" min="5" max="60" step="5" value=${st.alertDelay} onInput=${e=>set('alertDelay',+e.target.value)}/></div>
       <button className="btn full" onClick=${test}><${Icon} n="vib" s=${18}/>Test vibration${sim?' (simulated)':''}</button></div>
-    <div className="card"><details><summary>Hardware integration notes <${Icon} n="chev" s=${16}/></summary>
+    <div className="card"><details><summary>Future hardware (ESP32) notes <${Icon} n="chev" s=${16}/></summary>
       <p>The app reads sensor data through a <code>source</code> interface. Today the <code>SimulatedImuSource</code> is active; <code>Esp32BleSource</code> and <code>Esp32WifiSource</code> are prepared but no protocol is finalised.</p>
       <p><b style=${{color:'var(--ink)'}}>Proposed BLE packet</b> (for team agreement): one notification of 12 bytes, six little-endian int16 raw counts. At MPU6050 defaults, divide accel by 16384 (±2 g) and gyro by 131 (±250 °/s).</p>
       <pre>ax ay az gx gy gz   int16 LE × 6
@@ -915,6 +979,52 @@ function Calibration({close}){
       <div className="row" style=${{gap:8,marginTop:10}}><button className="btn" style=${{flex:1}} onClick=${()=>{setStep(2);setRes(null)}}>Redo</button><button className="btn pri" style=${{flex:1}} onClick=${close}>Done</button></div></div>`}
   </div></div>`}
 
+/* ---------------- LABELLED EVALUATION ---------------- */
+function Evaluation({close}){useTick();const[hold,setHold]=useState(20);const[reps,setReps]=useState(2);const[quiet,setQuiet]=useState(true);
+  const E=S.ev,on=S.link.status==='streaming',res=E&&!E.running?E.res:null,L=S.live,pct=v=>v==null?'–':(v*100).toFixed(0)+'%';
+  const total=EVAL_PROTO.length*reps*hold;
+  return html`<div className="overlay"><div className="screen" style=${{paddingBottom:30}}>
+    <div className="hdr"><button className="iconbtn" onClick=${()=>{if(E&&E.running)finishEval(true);close()}} aria-label="Close"><${Icon} n="x" s=${18}/></button><b>Labelled evaluation</b><span style=${{width:42}}></span></div>
+    ${(!E||(!E.running&&!res))&&html`<div className="enter">
+      <p className="sub" style=${{fontSize:14,color:'var(--ink)',opacity:.85}}>The wearer follows spoken prompts through a fixed posture script. Each prompt is the ground-truth label; ALIGNA's live classification is compared with it.</p>
+      ${!S.calib.done&&html`<div className="hatch"><${Icon} n="target" s=${18}/><span>Calibrate first, so angles are relative to the wearer's neutral posture.</span></div>`}
+      ${S.link.kind==='simulated'&&html`<div className="hatch"><${Icon} n="flask" s=${18}/><span>The demo source is active. Results would describe the simulator, not a person. Link the iPhone for real results.</span></div>`}
+      <div className="card"><div className="lbl">Script (repeated)</div><div style=${{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>${EVAL_PROTO.map((k,i)=>html`<span key=${i} className="chip" style=${{color:POSTURES[k].color}}>${POSTURES[k].label}</span>`)}</div></div>
+      <div className="card"><div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Hold each posture</div><div className="seg">${[10,20,30].map(v=>html`<button key=${v} className=${hold===v?'on':''} onClick=${()=>setHold(v)}>${v} s</button>`)}</div></div>
+        <div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Repetitions</div><div className="seg">${[1,2,3].map(v=>html`<button key=${v} className=${reps===v?'on':''} onClick=${()=>setReps(v)}>${v}×</button>`)}</div></div>
+        <div className="setrow row between"><span style=${{fontSize:14}}>Pause nudges during the test</span><button className=${'tog'+(quiet?' on':'')} role="switch" aria-checked=${quiet} aria-label="Pause nudges" onClick=${()=>setQuiet(!quiet)}></button></div>
+        <div className="tiny">Total ${fmtT(total)}. The first 3 s after each prompt are treated as transition and not scored.</div></div>
+      <button className="btn pri full" disabled=${!on} onClick=${()=>startEval(hold,reps,quiet)}><${Icon} n="play" s=${18}/>Start evaluation</button></div>`}
+    ${E&&E.running&&(()=>{const idx=Math.max(0,E.idx),y=E.steps[idx],ts=E.t-idx*E.hold,nx=E.steps[idx+1];return html`<div className="enter" style=${{textAlign:'center'}}>
+      <div className="lbl" style=${{marginTop:10}}>Step ${idx+1} of ${E.steps.length} · ${ts<E.gap?'transition (not scored)':'scoring'}</div>
+      <div className="posLabel" style=${{color:POSTURES[y].color,fontSize:36,margin:'8px 0'}}>${POSTURES[y].label}</div>
+      <p className="sub" style=${{fontSize:15}}>${EVAL_TXT[y]}</p>
+      <div className="bar" style=${{height:10,margin:'16px 0 6px'}}><i style=${{width:Math.min(100,ts/E.hold*100)+'%',background:POSTURES[y].color}}></i></div>
+      <div className="row between tiny"><span>${Math.ceil(E.hold-ts)} s left</span><span>${nx?'Next: '+POSTURES[nx].label:'Last step'}</span></div>
+      <div className="card" style=${{marginTop:16,textAlign:'left'}}><div className="row between"><span className="lbl">ALIGNA predicts</span><b style=${{color:POSTURES[L.cls].color}}>${POSTURES[L.cls].label}</b></div>
+        <div className="row between tiny" style=${{marginTop:6}}><span>tilt ${fmtA(L.p)} · lateral ${fmtA(L.r)}</span><span>${L.cls===y?'match':'mismatch'}</span></div></div>
+      <div className="bar" style=${{height:6,marginTop:6}}><i style=${{width:E.t/(E.steps.length*E.hold)*100+'%',background:'#18C3B0'}}></i></div>
+      <div className="tiny" style=${{marginTop:4}}>Overall ${fmtT(E.t)} / ${fmtT(E.steps.length*E.hold)}</div>
+      <button className="btn warn full" style=${{marginTop:16}} onClick=${()=>finishEval(true)}><${Icon} n="x" s=${16}/>Stop and score so far</button></div>`})()}
+    ${res&&html`<div className="enter">
+      <div className="card" style=${{textAlign:'center'}}><div className="lbl">Accuracy${res.stopped?' (partial run)':''}</div><div className="num" style=${{fontSize:48,fontWeight:600,lineHeight:1.1}}>${pct(res.acc)}</div>
+        <div className="tiny">${res.n} scored samples at 10 Hz · macro F1 ${res.macroF==null?'–':res.macroF.toFixed(2)} · ${SRC[res.src]?SRC[res.src].data:res.src}${res.calibrated?'':' · not calibrated'}</div></div>
+      <div className="card"><div className="h2" style=${{marginBottom:8}}>Confusion matrix</div><div className="tiny" style=${{marginBottom:6}}>Rows: true posture · columns: predicted</div>
+        <div style=${{display:'grid',gridTemplateColumns:'64px repeat(6,minmax(0,1fr))',gap:3,fontSize:11}}>
+          <span></span>${PKEYS.map(k=>html`<span key=${'h'+k} style=${{textAlign:'center',color:POSTURES[k].color}}>${SHORT[k]}</span>`)}
+          ${PKEYS.map(a=>{const rowN=PKEYS.reduce((x,b)=>x+res.M[a][b],0);return html`<${React.Fragment} key=${a}><span style=${{color:POSTURES[a].color,alignSelf:'center'}}>${SHORT[a]}</span>
+            ${PKEYS.map(b=>{const v=res.M[a][b],f=rowN?v/rowN:0;return html`<span key=${b} className="mono" style=${{textAlign:'center',padding:'7px 0',borderRadius:6,background:a===b?`rgba(60,242,180,${.12+f*.6})`:`rgba(255,107,122,${f*.7})`,color:f>.5?'#03221C':'var(--ink)'}}>${v}</span>`})}<//>`})}</div></div>
+      <div className="card"><div className="h2" style=${{marginBottom:6}}>Per-class metrics</div>
+        <table><thead><tr><th>Posture</th><th className="r">P</th><th className="r">R</th><th className="r">F1</th><th className="r">Latency</th></tr></thead><tbody>
+        ${res.per.map(x=>html`<tr key=${x.k}><td>${POSTURES[x.k].label}</td><td className="r">${pct(x.P)}</td><td className="r">${pct(x.R)}</td><td className="r">${x.F==null?'–':x.F.toFixed(2)}</td><td className="r">${x.lat==null?'–':x.lat.toFixed(1)+' s'}${x.miss?html`<span className="tiny"> (${x.miss} missed)</span>`:''}</td></tr>`)}</tbody></table>
+        <div className="tiny" style=${{marginTop:8}}>Latency = median time from prompt to first matching prediction (includes the human transition, filter and 0.4 s debounce).</div></div>
+      <div className="row" style=${{gap:8,flexWrap:'wrap'}}>
+        <button className="btn sm" onClick=${()=>exportCSV(`aligna-eval-metrics-${stamp()}.csv`,evalRows(res))}><${Icon} n="save" s=${16}/>Metrics CSV</button>
+        <button className="btn sm" onClick=${()=>exportCSV(`aligna-eval-samples-${stamp()}.csv`,[['t_s','true_label','predicted','transition','tilt_deg','lateral_deg','gyro_dps'],...res.rows])}><${Icon} n="save" s=${16}/>Samples CSV</button>
+        <button className="btn sm" onClick=${()=>{S.ev=null}}><${Icon} n="reset" s=${16}/>New run</button>
+        <button className="btn sm pri" onClick=${close}>Done</button></div></div>`}
+  </div></div>`}
+
 /* ---------------- PROFILE ---------------- */
 function Profile({back,replay}){
   useTick();const st=S.settings;const set=(k,v)=>{st[k]=v;saveSettings()};
@@ -929,7 +1039,7 @@ function Profile({back,replay}){
       <div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Feedback sensitivity</div><div className="seg">${['relaxed','balanced','strict'].map(k=>html`<button key=${k} className=${st.sensitivity===k?'on':''} onClick=${()=>{set('sensitivity',k);toast(`Sensitivity: ${k} · slouch > ${SENS[k].slouch}°`)}}>${k[0].toUpperCase()+k.slice(1)}</button>`)}</div>
         <div className="tiny" style=${{marginTop:6}}>Slouch > ${SENS[st.sensitivity].slouch}° · lean > ±${SENS[st.sensitivity].lean}° · bend > ${SENS[st.sensitivity].bend}°</div></div>
       <${Sl} k="alertDelay" label="Slouch detection duration" min=${5} max=${60} step=${5} u=" s"/><${Sl} k="vibIntensity" label="Vibration intensity" min=${10} max=${100} step=${5} u="%"/></div>
-    <div className="card"><div className="h2">Notifications</div><${Tog} k="banners" label="In-app alert banners" sub="Show a banner when a haptic nudge fires"/><${Tog} k="dailySummary" label="Daily summary" sub="Evening recap of posture time"/><${Tog} k="weekly" label="Weekly report" sub="Trend digest every Monday"/></div>
+    <div className="card"><div className="h2">Notifications</div><${Tog} k="banners" label="In-app alert banners" sub="Show a banner when a nudge fires"/><${Tog} k="dailySummary" label="Daily summary" sub="Evening recap of posture time"/><${Tog} k="weekly" label="Weekly report" sub="Trend digest every Monday"/></div>
     <div className="card"><div className="h2">Preferences</div><div className="setrow"><div style=${{fontSize:14,marginBottom:8}}>Angle units</div><div className="seg">${[['deg','Degrees'],['rad','Radians']].map(([k,n])=>html`<button key=${k} className=${st.units===k?'on':''} onClick=${()=>set('units',k)}>${n}</button>`)}</div></div>
       <div className="setrow row" style=${{gap:8}}><button className="btn sm" style=${{flex:1}} onClick=${replay}>Replay onboarding</button><button className="btn sm warn" style=${{flex:1}} onClick=${()=>{S.saved=[];store.set('saved',[]);S.calib={done:false,p:0,r:0,at:null};store.set('calib',S.calib);S.sess=newSession();toast('Demo data and calibration cleared','#8EB2AF','reset')}}>Reset demo data</button></div></div>
     <p className="tiny" style=${{textAlign:'center',padding:'0 10px'}}>ALIGNA is a proof-of-concept for DH803 (PostureSense). The alignment score is an app-defined metric from IMU tilt angles. It is not a medical measurement or diagnosis.</p>
@@ -939,8 +1049,8 @@ function Profile({back,replay}){
 function Onboarding({done}){const[i,setI]=useState(0);
   const pages=[
     {t:'Your posture. Your balance. Your wellbeing.',s:'ALIGNA pairs with the PostureSense wearable to show how you sit and stand, as it happens.',pic:html`<div style=${{display:'grid',placeItems:'center',gap:16}}><${Logo} s=${112}/><b style=${{letterSpacing:'.3em',fontSize:26}}>ALIGNA</b></div>`},
-    {t:'A tiny sensor on your upper back',s:'A 6-axis IMU (MPU6050) senses tilt and rotation. The ESP32 filters the signal and estimates your trunk angles.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${0} color="#3CF2B4" haptic=${true} uid="o1"/></div>`},
-    {t:'A gentle nudge when you slouch',s:'Hold a poor posture too long and the device vibrates. You choose how long and how strong.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${22} color="#FFB547" haptic=${true} uid="o2"/></div>`},
+    {t:'A sensor on your upper back',s:'An iPhone strapped between your shoulder blades senses tilt and rotation with its built-in accelerometer and gyroscope. ALIGNA estimates your trunk angles from it.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${0} color="#3CF2B4" haptic=${true} uid="o1"/></div>`},
+    {t:'A gentle nudge when you slouch',s:'Hold a poor posture too long and the iPhone on your back plays a chime and says "Straighten up". You choose how long to wait.',pic:html`<div style=${{width:240,margin:'0 auto'}}><${SideFigure} P=${22} color="#FFB547" haptic=${true} uid="o2"/></div>`},
     {t:'Calibrate your neutral',s:'Sit tall for five seconds so ALIGNA learns your upright position and the sensor’s mounting angle.',pic:html`<div style=${{display:'grid',placeItems:'center'}}><${Puck} buzz=${false} color="#3CF2B4"/></div>`}];
   const p=pages[i];
   return html`<div className="overlay" style=${{background:'radial-gradient(500px 400px at 50% 25%,#0F3A3A,transparent 70%),var(--bg)'}}>
@@ -959,22 +1069,22 @@ function DemoSheet({close}){useTick();const sim_=S.link.kind==='simulated';
     <p className="sub" style=${{margin:'4px 0 12px'}}>${sim_?'Drive the simulated wearer. Values change smoothly, like a real body.':'A real sensor source is active. Demo controls only drive the simulator; start the demo source on the Device tab to use them.'}</p>
     <div className="pgrid">${DEMO_OPTS.map(([k,n,c])=>html`<button key=${k} className=${'pbtn'+(sim.mode===k?' on':'')} style=${{color:sim.mode===k?c:'var(--ink)'}} disabled=${!sim_} onClick=${()=>{sim.setMode(k);toast(k==='auto'?'Auto demo: random realistic transitions':`Simulating: ${n}`,c,'flask')}}>
       <span style=${{width:26,height:26,borderRadius:9,background:c+'22',display:'grid',placeItems:'center'}}><i style=${{width:9,height:9,borderRadius:5,background:c}}></i></span>${n}</button>`)}</div>
-    <button className="btn full" style=${{marginTop:12}} onClick=${()=>fireHaptic('manual trigger',true)}><${Icon} n="vib" s=${18}/>Trigger haptic nudge</button></div><//>`}
+    <button className="btn full" style=${{marginTop:12}} onClick=${()=>fireHaptic('manual trigger',true)}><${Icon} n="vib" s=${18}/>Trigger nudge</button></div><//>`}
 
 /* ---------------- SIDE CONSOLE (desktop) ---------------- */
 function Console({replay}){useTick();const L=S.live,on=S.link.status==='streaming',sim_=S.link.kind==='simulated',th=SENS[S.settings.sensitivity],P=POSTURES[L.cls];
-  const nodes=[['IMU sample','MPU6050 · ax ay az · gx gy gz',on?`${L.ay.toFixed(2)} g · ${L.gyroMag.toFixed(0)}°/s`:'–'],['Calibration','subtract saved neutral',S.calib.done?`−${S.calib.p.toFixed(1)}°`:'not set'],
+  const nodes=[['IMU sample',`${S.link.kind==='simulated'?'Simulated 6-axis IMU':S.link.kind==='ble'?'MPU6050':'iPhone IMU'} · ax ay az · gx gy gz`,on?`${L.ay.toFixed(2)} g · ${L.gyroMag.toFixed(0)}°/s`:'–'],['Calibration','subtract saved neutral',S.calib.done?`−${S.calib.p.toFixed(1)}°`:'not set'],
     ['Filtering','complementary, α = 0.98',on?`${L.pAbs.toFixed(1)}° raw`:'–'],['Angle estimation','forward tilt · lateral tilt',on?`${L.p.toFixed(1)}° · ${L.r.toFixed(1)}°`:'–'],
-    ['Classification',`threshold rules · ML slot (DT/SVM/RF)`,on?P.label:'–'],['Feedback',`vibrate after ${S.settings.alertDelay} s`,on?(P.kind==='poor'?`${L.bad.toFixed(0)} / ${S.settings.alertDelay} s`:'idle'):'–']];
+    ['Classification',`threshold rules · ML slot (DT/SVM/RF)`,on?P.label:'–'],['Feedback',`nudge after ${S.settings.alertDelay} s`,on?(P.kind==='poor'?`${L.bad.toFixed(0)} / ${S.settings.alertDelay} s`:'idle'):'–']];
   const hot=!on?-1:P.kind==='poor'?5:4;
   return html`<aside className="side">
     <div className="brand"><${Logo} s=${60}/><div><h1>ALIGNA</h1><p className="tag">Your posture. Your balance. Your wellbeing.</p></div></div>
-    <p style=${{color:'var(--mute)',maxWidth:520,margin:'18px 0 22px'}}>Companion app for <b style=${{color:'var(--ink)'}}>PostureSense</b>, a single-IMU wearable that detects upright, slouch, left/right lean, forward bend and movement, and nudges you with vibration. DH803 Wearable Health Technology · IIT Bombay.</p>
+    <p style=${{color:'var(--mute)',maxWidth:520,margin:'18px 0 22px'}}>Companion app for <b style=${{color:'var(--ink)'}}>PostureSense</b>. The current prototype uses an iPhone worn on the upper back as the inertial sensor and this tablet as the display. It detects upright, slouch, left/right lean, forward bend and movement, and nudges the wearer with sound. DH803 Wearable Health Technology · IIT Bombay.</p>
     <div className="row between" style=${{marginBottom:10}}><b>Signal pipeline · live</b><span className="chip demoPill" style=${{height:26}}>${src().tag}</span></div>
     ${nodes.map(([a,b,v],i)=>html`<div key=${a} className=${'pn'+(i<=hot&&on?' hot':'')}><span className="ix">${i+1}</span><div><b>${a}</b><span>${b}</span></div><span className="vv" style=${{color:i===4&&on?P.color:undefined}}>${v}</span></div>`)}
     <div style=${{margin:'22px 0 10px'}}><b>Demo controls</b><span className="tiny"> · drive the simulated wearer</span></div>
     <div className="sideBtns">${DEMO_OPTS.map(([k,n,c])=>html`<button key=${k} className=${sim.mode===k?'on':''} disabled=${!sim_} onClick=${()=>{sim.setMode(k);toast(k==='auto'?'Auto demo: random realistic transitions':`Simulating: ${n}`,c,'flask')}}>${n}</button>`)}
-      <button onClick=${()=>fireHaptic('manual trigger',true)}>Trigger haptic</button><button onClick=${replay}>Replay onboarding</button></div>
+      <button onClick=${()=>fireHaptic('manual trigger',true)}>Trigger nudge</button><button onClick=${replay}>Replay onboarding</button></div>
     <p className="tiny" style=${{marginTop:18,maxWidth:520}}>Thresholds (${S.settings.sensitivity}): slouch > ${th.slouch}°, lean > ±${th.lean}°, bend > ${th.bend}°, movement when gyro magnitude > 30 °/s. ${sim_?'All values on this page come from the in-app simulator until a real sensor is connected.':S.link.kind==='phone'?'Live values come from the iPhone motion sensors, not the PostureSense hardware.':'Live values come from the connected ESP32.'}</p>
   </aside>`}
 
@@ -983,14 +1093,14 @@ const TABS=[['home','Home','home'],['live','Live','live'],['session','Session','
 function Clock(){useTick();const d=new Date();return html`<span className="num">${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</span>`}
 function App(){
   useTick();const[tab,setTab]=useState(()=>{const h=location.hash.slice(1);return TABS.some(t=>t[0]===h)||h==='profile'?h:'home'});
-  const[onb,setOnb]=useState(!S.onboarded);const[cal,setCal]=useState(false);const[demo,setDemo]=useState(false);const[shake,setShake]=useState(false);
+  const[onb,setOnb]=useState(!S.onboarded);const[evOpen,setEvOpen]=useState(false);const[cal,setCal]=useState(false);const[demo,setDemo]=useState(false);const[shake,setShake]=useState(false);
   const[scale,setScale]=useState(1);const scr=useRef(null);
   useEffect(()=>{const f=()=>setScale(Math.min(1,(window.innerHeight-48)/844));f();window.addEventListener('resize',f);shakeFn=()=>{setShake(true);setTimeout(()=>setShake(false),520)};return()=>window.removeEventListener('resize',f)},[]);
   useEffect(()=>{const f=()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)||h==='profile')setTab(h)};window.addEventListener('hashchange',f);return()=>window.removeEventListener('hashchange',f)},[]);
   const go=t=>{setTab(t);try{history.replaceState(null,'','#'+t)}catch(e){}if(scr.current)scr.current.scrollTop=0};
   const finishOnb=calNow=>{setOnb(false);S.onboarded=true;store.set('onboarded',true);if(calNow){go('device');setCal(true)}};
   const replay=()=>{setOnb(true)};
-  const screen={home:html`<${Home} go=${go} openDemo=${()=>setDemo(true)} openCal=${()=>setCal(true)}/>`,live:html`<${Live}/>`,session:html`<${Session}/>`,trends:html`<${Trends}/>`,device:html`<${Device} openCal=${()=>setCal(true)}/>`,profile:html`<${Profile} back=${()=>go('home')} replay=${replay}/>`}[tab];
+  const screen={home:html`<${Home} go=${go} openDemo=${()=>setDemo(true)} openCal=${()=>setCal(true)}/>`,live:html`<${Live}/>`,session:html`<${Session} openEval=${()=>setEvOpen(true)}/>`,trends:html`<${Trends}/>`,device:html`<${Device} openCal=${()=>setCal(true)}/>`,profile:html`<${Profile} back=${()=>go('home')} replay=${replay}/>`}[tab];
   return html`<div className="stage"><${Console} replay=${replay}/>
     <div className="phoneWrap" style=${{width:390*scale,height:844*scale}}>
       <div className=${'phone'+(shake?' shake':'')} style=${{transform:`scale(${scale})`}}>
@@ -1002,6 +1112,7 @@ function App(){
         <div className="toasts">${S.toasts.map(t=>html`<div className="toast" key=${t.id}><span style=${{color:t.color,display:'grid'}}><${Icon} n=${t.icon} s=${18}/></span><span>${t.text}</span></div>`)}</div>
         ${demo&&html`<${DemoSheet} close=${()=>setDemo(false)}/>`}
         ${cal&&html`<${Calibration} close=${()=>setCal(false)}/>`}
+        ${evOpen&&html`<${Evaluation} close=${()=>setEvOpen(false)}/>`}
         ${onb&&html`<${Onboarding} done=${finishOnb}/>`}
       </div></div></div>`}
 ReactDOM.createRoot(document.getElementById('root')).render(html`<${App}/>`);
